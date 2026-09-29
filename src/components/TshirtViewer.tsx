@@ -5,10 +5,16 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import type { ShirtSide } from "@/lib/configuration";
+import type { GarmentType, ShirtSide } from "@/lib/configuration";
 
 interface CanvasSource { element: HTMLCanvasElement | null; revision: number; }
-interface ViewerProps { color: string; side: ShirtSide; frontArtwork: CanvasSource; backArtwork: CanvasSource; }
+interface ViewerProps { garmentType: GarmentType; color: string; side: ShirtSide; frontArtwork: CanvasSource; backArtwork: CanvasSource; }
+
+const MODEL_PATHS: Record<GarmentType, string> = {
+  tshirt: "/models/02.glb",
+  hoodie: "/models/hoodie.glb",
+  pants: "/models/pants.glb",
+};
 
 function UVArtworkOverlay({ target, source }: { target: THREE.Mesh; source: CanvasSource }) {
   const overlayRef = useRef<{ mesh: THREE.Mesh; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial } | null>(null);
@@ -55,7 +61,7 @@ function UVArtworkOverlay({ target, source }: { target: THREE.Mesh; source: Canv
   return null;
 }
 
-function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: ViewerProps & { sourceScene: THREE.Group }) {
+function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<ViewerProps, "color" | "side" | "frontArtwork" | "backArtwork"> & { sourceScene: THREE.Group }) {
   const normalizedScene = useMemo(() => {
     sourceScene.updateMatrixWorld(true);
     const clone = sourceScene.clone(true);
@@ -103,23 +109,74 @@ function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: ViewerPr
   );
 }
 
-export default function TshirtViewer({ color, side, frontArtwork, backArtwork }: ViewerProps) {
+function GarmentModel({ garmentType, color, side, sourceScene }: Pick<ViewerProps, "garmentType" | "color" | "side"> & { sourceScene: THREE.Group }) {
+  const normalizedScene = useMemo(() => {
+    const clone = sourceScene.clone(true);
+    clone.updateMatrixWorld(true);
+    const bounds = new THREE.Box3();
+    clone.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.material = Array.isArray(object.material) ? object.material.map((material) => material.clone()) : object.material.clone();
+      object.castShadow = true;
+      object.receiveShadow = true;
+      bounds.expandByObject(object);
+    });
+    const size = bounds.getSize(new THREE.Vector3());
+    const center = bounds.getCenter(new THREE.Vector3());
+    const fitScale = 2.8 / Math.max(size.x, size.y, size.z, 0.001);
+    clone.scale.setScalar(fitScale);
+    clone.position.set(-center.x * fitScale, -center.y * fitScale, -center.z * fitScale);
+    clone.updateMatrixWorld(true);
+    return clone;
+  }, [sourceScene]);
+  const group = useRef<THREE.Group>(null);
+  const targetRotation = side === "front" ? 0 : Math.PI;
+  useEffect(() => {
+    normalizedScene.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach((material) => {
+        if (garmentType === "pants" && material instanceof THREE.MeshStandardMaterial) {
+          material.map = null;
+          material.needsUpdate = true;
+        }
+        if ("color" in material && material.color instanceof THREE.Color) material.color.set(color);
+      });
+    });
+  }, [color, garmentType, normalizedScene]);
+  useEffect(() => () => {
+    normalizedScene.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach((material) => material.dispose());
+    });
+  }, [normalizedScene]);
+  useFrame((_, delta) => {
+    if (!group.current) return;
+    const difference = targetRotation - group.current.rotation.y;
+    const shortest = Math.atan2(Math.sin(difference), Math.cos(difference));
+    group.current.rotation.y += shortest * Math.min(delta * 5, 1);
+  });
+  return <group ref={group}><primitive object={normalizedScene} /></group>;
+}
+
+export default function TshirtViewer({ garmentType, color, side, frontArtwork, backArtwork }: ViewerProps) {
   const [sourceScene, setSourceScene] = useState<THREE.Group | null>(null);
   const [loadError, setLoadError] = useState(false);
   useEffect(() => {
     let active = true;
-    new GLTFLoader().load("/models/02.glb", (gltf) => { if (active) setSourceScene(gltf.scene); }, undefined, () => { if (active) setLoadError(true); });
+    new GLTFLoader().load(MODEL_PATHS[garmentType], (gltf) => { if (active) setSourceScene(gltf.scene); }, undefined, () => { if (active) setLoadError(true); });
     return () => { active = false; };
-  }, []);
+  }, [garmentType]);
   return (
-    <div className="viewer-canvas" aria-label={`3D shirt preview, ${side} selected`}>
+    <div className="viewer-canvas" aria-label={`3D ${garmentType} preview, ${side} selected`}>
       <Canvas camera={{ position: [0, 0.25, 5.6], fov: 32 }} dpr={1} gl={{ antialias: false, powerPreference: "low-power" }}>
         <color attach="background" args={["#e3e0d7"]} /><ambientLight intensity={1.25} /><directionalLight position={[3, 5, 4]} intensity={3.1} /><directionalLight position={[-4, 2, -2]} intensity={0.65} /><hemisphereLight args={["#fffdf5", "#77756d", 0.9]} />
-        {sourceScene ? <Shirt color={color} side={side} frontArtwork={frontArtwork} backArtwork={backArtwork} sourceScene={sourceScene} /> : <mesh><boxGeometry args={[1, 1.5, 0.4]} /><meshStandardMaterial color={color} roughness={0.85} /></mesh>}
+        {sourceScene ? (garmentType === "tshirt" ? <Shirt color={color} side={side} frontArtwork={frontArtwork} backArtwork={backArtwork} sourceScene={sourceScene} /> : <GarmentModel garmentType={garmentType} color={color} side={side} sourceScene={sourceScene} />) : <mesh><boxGeometry args={[1, 1.5, 0.4]} /><meshStandardMaterial color={color} roughness={0.85} /></mesh>}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.38, 0]}><planeGeometry args={[10, 10]} /><meshStandardMaterial color="#d4d1c8" roughness={1} /></mesh>
         <OrbitControls enablePan={false} minDistance={4.2} maxDistance={7.2} minPolarAngle={Math.PI / 2.5} maxPolarAngle={Math.PI / 1.8} enableDamping dampingFactor={0.08} />
       </Canvas>
-      {loadError ? <div className="model-load-error">Could not load the 3D shirt model.</div> : null}
+      {loadError ? <div className="model-load-error">Could not load the 3D {garmentType} model.</div> : null}
       <div className="viewer-hint"><span className="drag-icon">↔</span> Drag to rotate <span>·</span> Scroll to zoom</div><div className="model-badge"><span /> Studio preview</div>
     </div>
   );

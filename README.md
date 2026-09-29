@@ -1,6 +1,6 @@
 # Threadline workshop studio
 
-Frontend-only T-shirt workshop configurator built with Next.js, Fabric.js, Three.js, and React Three Fiber.
+Frontend-only garment workshop configurator built with Next.js, Fabric.js, Three.js, and React Three Fiber.
 
 ## Run locally
 

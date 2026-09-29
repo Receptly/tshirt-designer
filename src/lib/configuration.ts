@@ -1,5 +1,6 @@
 export type ShirtSide = "front" | "back";
 export type ShirtSize = "S" | "M" | "L" | "XL" | "XXL";
+export type GarmentType = "tshirt" | "hoodie" | "pants";
 
 export interface ShirtDesign {
   imageId?: string;
@@ -15,6 +16,7 @@ export interface ShirtDesign {
 
 export interface DesignConfiguration {
   productId: string;
+  garmentType: GarmentType;
   shirtColor: string;
   size: ShirtSize;
   activeSide: ShirtSide;
@@ -35,6 +37,7 @@ export const shirtColors = [
 
 export const defaultDesign: DesignConfiguration = {
   productId: "classic-tshirt",
+  garmentType: "tshirt",
   shirtColor: shirtColors[0].value,
   size: "M",
   activeSide: "front",
