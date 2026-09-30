@@ -12,11 +12,11 @@ interface ViewerProps { garmentType: GarmentType; color: string; side: ShirtSide
 
 const MODEL_PATHS: Record<GarmentType, string> = {
   tshirt: "/models/02.glb",
-  hoodie: "/models/hoodie1.glb",
+  hoodie: "/models/premium_eco_hoodie.glb",
   pants: "/models/pants.glb",
 };
 
-function UVArtworkOverlay({ target, source }: { target: THREE.Mesh; source: CanvasSource }) {
+function UVArtworkOverlay({ target, source, flipY = false }: { target: THREE.Mesh; source: CanvasSource; flipY?: boolean }) {
   const overlayRef = useRef<{ mesh: THREE.Mesh; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial } | null>(null);
   const overlay = useMemo(() => {
     if (!source.element) return null;
@@ -31,17 +31,19 @@ function UVArtworkOverlay({ target, source }: { target: THREE.Mesh; source: Canv
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.ClampToEdgeWrapping;
     texture.wrapT = THREE.ClampToEdgeWrapping;
-    texture.repeat.set(1 / Math.max(maxU - minU, 0.001), 1 / Math.max(maxV - minV, 0.001));
-    texture.offset.set(-minU * texture.repeat.x, -minV * texture.repeat.y);
+    const uRange = Math.max(maxU - minU, 0.001);
+    const vRange = Math.max(maxV - minV, 0.001);
+    texture.repeat.set(1 / uRange, flipY ? -1 / vRange : 1 / vRange);
+    texture.offset.set(-minU * texture.repeat.x, flipY ? maxV / vRange : -minV * texture.repeat.y);
     texture.needsUpdate = true;
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, toneMapped: false });
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, toneMapped: false });
     const mesh = new THREE.Mesh(target.geometry, material);
     mesh.name = `${target.name}-artwork-overlay`;
     mesh.userData.artworkOverlay = true;
     mesh.renderOrder = 2;
     mesh.frustumCulled = false;
     return { mesh, texture, material };
-  }, [source.element, target]);
+  }, [flipY, source.element, target]);
 
   useEffect(() => {
     if (!overlay) return;
@@ -67,11 +69,18 @@ function GarmentArtworkOverlays({ garmentType, scene, sources }: { garmentType: 
     scene.traverse((object) => {
       if (object instanceof THREE.Mesh && object.visible && object.geometry.getAttribute("uv")) meshes.push(object);
     });
-    if (garmentType === "hoodie") return [meshes[2], meshes[3], meshes[7]].filter((mesh): mesh is THREE.Mesh => Boolean(mesh));
+    if (garmentType === "hoodie") return [
+      { mesh: meshes[3], slot: "body" as GarmentArtworkSlot },
+      { mesh: meshes[9], slot: "leftArm" as GarmentArtworkSlot },
+      { mesh: meshes[5], slot: "rightArm" as GarmentArtworkSlot },
+    ].filter((target): target is { mesh: THREE.Mesh; slot: GarmentArtworkSlot } => Boolean(target.mesh));
+    if (garmentType === "pants" && meshes[0]) return [
+      { mesh: meshes[0], slot: "leftArm" as GarmentArtworkSlot },
+      { mesh: meshes[0], slot: "rightArm" as GarmentArtworkSlot },
+    ];
     return [];
   }, [garmentType, scene]);
-  const slots: GarmentArtworkSlot[] = ["body", "leftArm", "rightArm"];
-  return <>{targets.map((target, index) => <UVArtworkOverlay key={target.uuid} target={target} source={sources[slots[index]]} />)}</>;
+  return <>{targets.map(({ mesh, slot }) => <UVArtworkOverlay key={`${mesh.uuid}-${slot}`} target={mesh} source={sources[slot]} flipY={slot !== "body"} />)}</>;
 }
 
 function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<ViewerProps, "color" | "side" | "frontArtwork" | "backArtwork"> & { sourceScene: THREE.Group }) {
