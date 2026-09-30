@@ -1,6 +1,7 @@
 export type ShirtSide = "front" | "back";
 export type ShirtSize = "S" | "M" | "L" | "XL" | "XXL";
 export type GarmentType = "tshirt" | "hoodie" | "pants";
+export type GarmentArtworkSlot = "body" | "leftArm" | "rightArm";
 
 export interface ShirtDesign {
   imageId?: string;

@@ -4,10 +4,13 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Check, RotateCcw, Save, Slash, Trash2, Type, Upload } from "lucide-react";
 import { ChangeEvent, startTransition, useEffect, useRef, useState } from "react";
-import { activeDesign, defaultDesign, shirtColors, type DesignConfiguration, type ShirtDesign, type ShirtSize, type ShirtSide, updateActiveDesign, updateCanvasJson } from "@/lib/configuration";
+import { activeDesign, defaultDesign, shirtColors, type GarmentArtworkSlot, type DesignConfiguration, type ShirtDesign, type ShirtSize, type ShirtSide, updateActiveDesign, updateCanvasJson } from "@/lib/configuration";
 import DesignCanvasPair, { type DesignCanvasActions } from "@/components/DesignCanvasPair";
+import type { CanvasSource } from "@/components/TshirtViewer";
 
 const GarmentViewer = dynamic(() => import("@/components/TshirtViewer"), { ssr: false, loading: () => <div className="viewer-loading"><div className="spinner" /><span>Preparing studio...</span></div> });
+const artworkSlots: { id: GarmentArtworkSlot; label: string }[] = [{ id: "body", label: "Body" }, { id: "leftArm", label: "Left arm" }, { id: "rightArm", label: "Right arm" }];
+const emptyArtworkSlots = (): Record<GarmentArtworkSlot, CanvasSource> => ({ body: { element: null, revision: 0 }, leftArm: { element: null, revision: 0 }, rightArm: { element: null, revision: 0 } });
 
 export default function Configurator() {
   const [configuration, setConfiguration] = useState<DesignConfiguration>(defaultDesign);
@@ -17,6 +20,7 @@ export default function Configurator() {
   const canvasActions = useRef<Partial<Record<ShirtSide, DesignCanvasActions>>>({});
   const [frontArtwork, setFrontArtwork] = useState({ element: null as HTMLCanvasElement | null, revision: 0 });
   const [backArtwork, setBackArtwork] = useState({ element: null as HTMLCanvasElement | null, revision: 0 });
+  const [meshArtwork, setMeshArtwork] = useState({ front: emptyArtworkSlots(), back: emptyArtworkSlots() });
   useEffect(() => {
     let restored = defaultDesign;
     const saved = window.localStorage.getItem("threadline-design");
@@ -79,6 +83,28 @@ export default function Configurator() {
     image.src = objectUrl;
     event.target.value = "";
   };
+  const handleMeshUpload = (event: ChangeEvent<HTMLInputElement>, slot: GarmentArtworkSlot) => {
+    const file = event.target.files?.[0]; if (!file) return;
+    const uploadSide = configuration.activeSide;
+    if (!["image/png", "image/jpeg"].includes(file.type)) { setMessage("Please choose a PNG or JPEG image."); return; }
+    if (file.size > 10 * 1024 * 1024) { setMessage("Images must be under 10 MB."); return; }
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      if (image.width < 80 || image.height < 80) { setMessage("Choose an image at least 80 × 80 pixels."); return; }
+      const scale = Math.min(1, 1024 / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+      setMeshArtwork((current) => ({ ...current, [uploadSide]: { ...current[uploadSide], [slot]: { element: canvas, revision: Date.now() } } }));
+      setMessage(`${slot === "leftArm" ? "Left arm" : slot === "rightArm" ? "Right arm" : "Body"} artwork added.`);
+    };
+    image.onerror = () => { URL.revokeObjectURL(objectUrl); setMessage("That image could not be decoded."); };
+    image.src = objectUrl;
+    event.target.value = "";
+  };
   const saveDesign = () => { setIsSaving(true); window.localStorage.setItem("threadline-design", JSON.stringify(configuration)); window.setTimeout(() => { setIsSaving(false); setMessage("Design saved to this browser."); }, 450); };
   useEffect(() => {
     if (!hasHydrated) return;
@@ -90,8 +116,8 @@ export default function Configurator() {
       <header className="topbar"><Link className="brand" href="/" aria-label="Garment Designer home"><span className="brand-mark">G</span><span>Garment Designer</span></Link><div className="topbar-actions"><span className="save-state">{message || "Your design is private to this browser"}</span><button className="text-button" onClick={() => { setConfiguration(defaultDesign); window.localStorage.removeItem("threadline-design"); setMessage("Started a fresh design."); }}><RotateCcw size={15} /> Reset</button><button className="save-button" onClick={saveDesign}><Save size={16} /> {isSaving ? "Saving..." : "Save design"}</button></div></header>
       <section className="workspace"><div className="intro"><p className="eyebrow">Workshop / Garment configurator</p><h1>Make it unmistakably yours.</h1><p className="lede">Customize garments, place artwork on each side, and save the editable design for production.</p></div>
         <div className="garment-selector" role="group" aria-label="Garment type">{([{ id: "tshirt", label: "T-shirt" }, { id: "hoodie", label: "Hoodie" }, { id: "pants", label: "Pants" }] as const).map((garment) => <button key={garment.id} className={configuration.garmentType === garment.id ? "garment-option selected" : "garment-option"} onClick={() => setConfiguration((current) => ({ ...current, garmentType: garment.id }))} aria-pressed={configuration.garmentType === garment.id}>{garment.label}</button>)}</div>
-        <div className="builder-grid"><section className="preview-panel"><div className="preview-topline"><span className="preview-label">Live 3D preview</span><span className="preview-side"><span className="live-dot" /> {configuration.activeSide} view</span></div><GarmentViewer key={configuration.garmentType} garmentType={configuration.garmentType} color={configuration.shirtColor} side={configuration.activeSide} frontArtwork={frontArtwork} backArtwork={backArtwork} /><div className="side-switcher" role="tablist" aria-label="Artwork side">{(["front", "back"] as ShirtSide[]).map((side) => <button key={side} className={configuration.activeSide === side ? "side-tab active" : "side-tab"} onClick={() => setConfiguration((current) => ({ ...current, activeSide: side }))} role="tab" aria-selected={configuration.activeSide === side}>{side}<span className={side === "front" ? "shirt-outline front-outline" : "shirt-outline back-outline"} /></button>)}</div></section>
-          <aside className="controls-panel"><div className="control-section upload-section"><div className="section-heading"><div><span className="section-kicker">01 / Artwork</span><h2>Add your design</h2></div><span className="format-note">PNG / JPG · 10 MB</span></div><label className="upload-zone"><Upload size={20} /><span>{design ? "Replace artwork" : "Choose an image"}</span><small>Transparent PNGs look best on fabric</small><input type="file" accept="image/png,image/jpeg" onChange={handleUpload} /></label>{design ? <div className="asset-row"><div className="asset-thumb" style={{ backgroundImage: `url(${design.thumbnailUrl ?? design.imageUrl})` }} /><div className="asset-meta"><strong>{design.fileName}</strong><span>{design.imageWidth} × {design.imageHeight} px</span></div><button className="icon-button" onClick={() => { canvasActions.current[configuration.activeSide]?.clear(); setConfiguration((current) => updateActiveDesign(current, null)); }} aria-label="Clear artwork from this side"><Trash2 size={16} /></button></div> : null}</div>
+        <div className="builder-grid"><section className="preview-panel"><div className="preview-topline"><span className="preview-label">Live 3D preview</span><span className="preview-side"><span className="live-dot" /> {configuration.activeSide} view</span></div><GarmentViewer key={configuration.garmentType} garmentType={configuration.garmentType} color={configuration.shirtColor} side={configuration.activeSide} frontArtwork={frontArtwork} backArtwork={backArtwork} frontMeshArtwork={meshArtwork.front} backMeshArtwork={meshArtwork.back} /><div className="side-switcher" role="tablist" aria-label="Artwork side">{(["front", "back"] as ShirtSide[]).map((side) => <button key={side} className={configuration.activeSide === side ? "side-tab active" : "side-tab"} onClick={() => setConfiguration((current) => ({ ...current, activeSide: side }))} role="tab" aria-selected={configuration.activeSide === side}>{side}<span className={side === "front" ? "shirt-outline front-outline" : "shirt-outline back-outline"} /></button>)}</div></section>
+          <aside className="controls-panel"><div className="control-section upload-section"><div className="section-heading"><div><span className="section-kicker">01 / Artwork</span><h2>Add your design</h2></div><span className="format-note">PNG / JPG · 10 MB</span></div><div className="mesh-upload-grid">{artworkSlots.map((slot) => { const uploaded = meshArtwork[configuration.activeSide][slot.id].element; return <label className="mesh-upload" key={slot.id}><Upload size={16} /><strong>{slot.label}</strong><span>{uploaded ? "Replace artwork" : "Upload artwork"}</span><input type="file" accept="image/png,image/jpeg" onChange={(event) => handleMeshUpload(event, slot.id)} /></label>; })}</div><label className="upload-zone"><Upload size={20} /><span>{design ? "Replace canvas artwork" : "Choose canvas artwork"}</span><small>Use the editor below for text, lines, and placement</small><input type="file" accept="image/png,image/jpeg" onChange={handleUpload} /></label>{design ? <div className="asset-row"><div className="asset-thumb" style={{ backgroundImage: `url(${design.thumbnailUrl ?? design.imageUrl})` }} /><div className="asset-meta"><strong>{design.fileName}</strong><span>{design.imageWidth} × {design.imageHeight} px</span></div><button className="icon-button" onClick={() => { canvasActions.current[configuration.activeSide]?.clear(); setConfiguration((current) => updateActiveDesign(current, null)); }} aria-label="Clear artwork from this side"><Trash2 size={16} /></button></div> : null}</div>
             <div className="control-section"><div className="section-heading"><div><span className="section-kicker">02 / Design canvas</span><h2>{configuration.activeSide} artwork</h2></div><span className="format-note">Drag · Resize · Rotate</span></div><div className="canvas-tools"><button className="canvas-tool" onClick={() => canvasActions.current[configuration.activeSide]?.addText()}><Type size={15} /> Text</button><button className="canvas-tool" onClick={() => canvasActions.current[configuration.activeSide]?.addLine()}><Slash size={15} /> Line</button><button className="canvas-tool" onClick={() => canvasActions.current[configuration.activeSide]?.removeSelected()}><Trash2 size={15} /> Delete</button></div>{hasHydrated ? <DesignCanvasPair activeSide={configuration.activeSide} frontJson={configuration.frontCanvasJson} backJson={configuration.backCanvasJson} onRegister={registerCanvas} onChange={updateCanvas} /> : <div className="empty-control">Restoring saved artwork...</div>}</div>
             <div className="control-section color-section"><div className="section-heading"><div><span className="section-kicker">03 / Garment</span><h2>Garment color</h2></div><span className="color-name">{shirtColors.find((color) => color.value === configuration.shirtColor)?.name}</span></div><div className="swatches">{shirtColors.map((color) => <button key={color.value} className={configuration.shirtColor === color.value ? "swatch selected" : "swatch"} style={{ backgroundColor: color.value }} onClick={() => setConfiguration((current) => ({ ...current, shirtColor: color.value }))} aria-label={`Select ${color.name} garment`} aria-pressed={configuration.shirtColor === color.value}>{configuration.shirtColor === color.value ? <Check size={14} /> : null}</button>)}</div></div>
             <div className="control-section options-section"><span className="section-kicker">Garment size</span><div className="size-options">{(["S", "M", "L", "XL", "XXL"] as ShirtSize[]).map((size) => <button key={size} className={configuration.size === size ? "size-option selected" : "size-option"} onClick={() => setConfiguration((current) => ({ ...current, size }))}>{size}</button>)}</div></div>
