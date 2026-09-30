@@ -61,14 +61,14 @@ function UVArtworkOverlay({ target, source }: { target: THREE.Mesh; source: Canv
   return null;
 }
 
-function GarmentArtworkOverlays({ scene, source }: { scene: THREE.Group; source: CanvasSource }) {
+function GarmentArtworkOverlays({ garmentType, scene, source }: { garmentType: GarmentType; scene: THREE.Group; source: CanvasSource }) {
   const targets = useMemo(() => {
     const meshes: THREE.Mesh[] = [];
     scene.traverse((object) => {
       if (object instanceof THREE.Mesh && object.visible && object.geometry.getAttribute("uv")) meshes.push(object);
     });
-    return meshes;
-  }, [scene]);
+    return garmentType === "hoodie" ? meshes.slice(0, 1) : meshes;
+  }, [garmentType, scene]);
   return <>{targets.map((target) => <UVArtworkOverlay key={target.uuid} target={target} source={source} />)}</>;
 }
 
@@ -169,7 +169,7 @@ function GarmentModel({ garmentType, color, side, frontArtwork, backArtwork, sou
     group.current.rotation.y += shortest * Math.min(delta * 5, 1);
   });
   const artwork = side === "front" ? frontArtwork : backArtwork;
-  return <group ref={group}><primitive object={normalizedScene} /><GarmentArtworkOverlays scene={normalizedScene} source={artwork} /></group>;
+  return <group ref={group}><primitive object={normalizedScene} /><GarmentArtworkOverlays garmentType={garmentType} scene={normalizedScene} source={artwork} /></group>;
 }
 
 export default function TshirtViewer({ garmentType, color, side, frontArtwork, backArtwork }: ViewerProps) {
