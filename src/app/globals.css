@@ -23,8 +23,8 @@ button { cursor: pointer; }
 .intro h1 { font-size: clamp(40px, 5vw, 66px); line-height: .98; font-weight: 400; letter-spacing: -.035em; margin: 13px 0 17px; }
 .lede { color: var(--muted); font-size: 17px; line-height: 1.55; max-width: 520px; margin: 0; }
 .builder-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(380px, .92fr); gap: 30px; align-items: start; }
-.garment-selector { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 24px; border: 1px solid var(--line); background: #efeee9; }
-.garment-option { min-width: 108px; padding: 10px 16px; border: 1px solid transparent; background: transparent; color: var(--muted); font: 12px Arial, sans-serif; }
+.garment-selector { display: inline-flex; align-items: center; gap: 4px; min-height: 48px; padding: 4px; margin: 0 0 24px; border: 1px solid var(--line); background: #efeee9; }
+.garment-option { min-width: 108px; min-height: 38px; padding: 10px 16px; border: 1px solid transparent; background: transparent; color: var(--muted); font: 12px Arial, sans-serif; }
 .garment-option.selected { background: #fffefa; border-color: var(--line); color: var(--ink); box-shadow: 0 1px 2px #20232212; }
 .model-unavailable { min-height: min(61vh, 590px); height: 430px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 24px; text-align: center; background: #e7e4dc; color: var(--ink); }
 .model-unavailable strong { font-size: 20px; font-weight: 400; }
