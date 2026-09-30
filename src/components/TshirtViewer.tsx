@@ -67,7 +67,7 @@ function GarmentArtworkOverlays({ garmentType, scene, sources }: { garmentType: 
     scene.traverse((object) => {
       if (object instanceof THREE.Mesh && object.visible && object.geometry.getAttribute("uv")) meshes.push(object);
     });
-    if (garmentType === "hoodie") return meshes.slice(0, 3);
+    if (garmentType === "hoodie") return [meshes[2], meshes[3], meshes[7]].filter((mesh): mesh is THREE.Mesh => Boolean(mesh));
     return [];
   }, [garmentType, scene]);
   const slots: GarmentArtworkSlot[] = ["body", "leftArm", "rightArm"];
