@@ -82,9 +82,7 @@ function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<Vie
     const bounds = new THREE.Box3();
     clone.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
-      const isGarment = ["T-Shirt", "T-Shirt.001"].includes(object.name);
-      object.visible = isGarment;
-      if (!isGarment) return;
+      object.visible = true;
       object.material = Array.isArray(object.material) ? object.material.map((material) => material.clone()) : object.material.clone();
       bounds.expandByObject(object);
     });
@@ -113,10 +111,17 @@ function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<Vie
       if ("color" in material && material.color instanceof THREE.Color) material.color.set(color);
     });
   });
+  const artworkTarget = useMemo(() => {
+    const meshes: THREE.Mesh[] = [];
+    normalizedScene.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.geometry.getAttribute("uv")) meshes.push(object);
+    });
+    return meshes[1] ?? meshes[0] ?? null;
+  }, [normalizedScene]);
   return (
     <group ref={group}>
       <primitive object={normalizedScene} />
-      {normalizedScene.getObjectByName("T-Shirt.001") instanceof THREE.Mesh ? <UVArtworkOverlay target={normalizedScene.getObjectByName("T-Shirt.001") as THREE.Mesh} source={side === "front" ? frontArtwork : backArtwork} /> : null}
+      {artworkTarget ? <UVArtworkOverlay target={artworkTarget} source={side === "front" ? frontArtwork : backArtwork} /> : null}
     </group>
   );
 }
