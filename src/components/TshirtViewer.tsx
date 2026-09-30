@@ -67,7 +67,7 @@ function GarmentArtworkOverlays({ garmentType, scene, source }: { garmentType: G
     scene.traverse((object) => {
       if (object instanceof THREE.Mesh && object.visible && object.geometry.getAttribute("uv")) meshes.push(object);
     });
-    return garmentType === "hoodie" ? meshes.slice(0, 1) : meshes;
+    return garmentType === "hoodie" ? meshes.slice(1, 2) : meshes;
   }, [garmentType, scene]);
   return <>{targets.map((target) => <UVArtworkOverlay key={target.uuid} target={target} source={source} />)}</>;
 }
