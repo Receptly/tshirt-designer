@@ -34,7 +34,7 @@ function UVArtworkOverlay({ target, source }: { target: THREE.Mesh; source: Canv
     texture.repeat.set(1 / Math.max(maxU - minU, 0.001), 1 / Math.max(maxV - minV, 0.001));
     texture.offset.set(-minU * texture.repeat.x, -minV * texture.repeat.y);
     texture.needsUpdate = true;
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, toneMapped: false });
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, toneMapped: false });
     const mesh = new THREE.Mesh(target.geometry, material);
     mesh.name = `${target.name}-artwork-overlay`;
     mesh.userData.artworkOverlay = true;

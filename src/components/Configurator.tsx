@@ -98,7 +98,14 @@ export default function Configurator() {
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(image.width * scale));
       canvas.height = Math.max(1, Math.round(image.height * scale));
-      canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const context = canvas.getContext("2d");
+      if (!context) { setMessage("This browser cannot prepare the artwork preview."); return; }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      for (let index = 0; index < pixels.data.length; index += 4) {
+        if (pixels.data[index] > 245 && pixels.data[index + 1] > 245 && pixels.data[index + 2] > 245) pixels.data[index + 3] = 0;
+      }
+      context.putImageData(pixels, 0, 0);
       const previewUrl = canvas.toDataURL(file.type === "image/png" ? "image/png" : "image/jpeg", 0.9);
       void meshCanvasActions.current[slot]?.addImage(previewUrl);
       setMessage(`${slot === "leftArm" ? "Left arm" : slot === "rightArm" ? "Right arm" : "Body"} artwork added.`);
