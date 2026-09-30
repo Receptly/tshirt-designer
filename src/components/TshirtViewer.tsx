@@ -12,7 +12,7 @@ interface ViewerProps { garmentType: GarmentType; color: string; side: ShirtSide
 
 const MODEL_PATHS: Record<GarmentType, string> = {
   tshirt: "/models/02.glb",
-  hoodie: "/models/hoodie.glb",
+  hoodie: "/models/hoodie1.glb",
   pants: "/models/pants.glb",
 };
 
@@ -67,7 +67,7 @@ function GarmentArtworkOverlays({ garmentType, scene, sources }: { garmentType: 
     scene.traverse((object) => {
       if (object instanceof THREE.Mesh && object.visible && object.geometry.getAttribute("uv")) meshes.push(object);
     });
-    if (garmentType === "hoodie") return meshes.slice(1, 4);
+    if (garmentType === "hoodie") return meshes.slice(0, 3);
     return [];
   }, [garmentType, scene]);
   const slots: GarmentArtworkSlot[] = ["body", "leftArm", "rightArm"];
