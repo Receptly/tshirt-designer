@@ -61,6 +61,17 @@ function UVArtworkOverlay({ target, source }: { target: THREE.Mesh; source: Canv
   return null;
 }
 
+function GarmentArtworkOverlays({ scene, source }: { scene: THREE.Group; source: CanvasSource }) {
+  const targets = useMemo(() => {
+    const meshes: THREE.Mesh[] = [];
+    scene.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.visible && object.geometry.getAttribute("uv")) meshes.push(object);
+    });
+    return meshes;
+  }, [scene]);
+  return <>{targets.map((target) => <UVArtworkOverlay key={target.uuid} target={target} source={source} />)}</>;
+}
+
 function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<ViewerProps, "color" | "side" | "frontArtwork" | "backArtwork"> & { sourceScene: THREE.Group }) {
   const normalizedScene = useMemo(() => {
     sourceScene.updateMatrixWorld(true);
@@ -109,7 +120,7 @@ function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<Vie
   );
 }
 
-function GarmentModel({ garmentType, color, side, sourceScene }: Pick<ViewerProps, "garmentType" | "color" | "side"> & { sourceScene: THREE.Group }) {
+function GarmentModel({ garmentType, color, side, frontArtwork, backArtwork, sourceScene }: Pick<ViewerProps, "garmentType" | "color" | "side" | "frontArtwork" | "backArtwork"> & { sourceScene: THREE.Group }) {
   const normalizedScene = useMemo(() => {
     const clone = sourceScene.clone(true);
     clone.updateMatrixWorld(true);
@@ -157,7 +168,8 @@ function GarmentModel({ garmentType, color, side, sourceScene }: Pick<ViewerProp
     const shortest = Math.atan2(Math.sin(difference), Math.cos(difference));
     group.current.rotation.y += shortest * Math.min(delta * 5, 1);
   });
-  return <group ref={group}><primitive object={normalizedScene} /></group>;
+  const artwork = side === "front" ? frontArtwork : backArtwork;
+  return <group ref={group}><primitive object={normalizedScene} /><GarmentArtworkOverlays scene={normalizedScene} source={artwork} /></group>;
 }
 
 export default function TshirtViewer({ garmentType, color, side, frontArtwork, backArtwork }: ViewerProps) {
@@ -172,7 +184,7 @@ export default function TshirtViewer({ garmentType, color, side, frontArtwork, b
     <div className="viewer-canvas" aria-label={`3D ${garmentType} preview, ${side} selected`}>
       <Canvas camera={{ position: [0, 0.25, 5.6], fov: 32 }} dpr={1} gl={{ antialias: false, powerPreference: "low-power" }}>
         <color attach="background" args={["#e3e0d7"]} /><ambientLight intensity={1.25} /><directionalLight position={[3, 5, 4]} intensity={3.1} /><directionalLight position={[-4, 2, -2]} intensity={0.65} /><hemisphereLight args={["#fffdf5", "#77756d", 0.9]} />
-        {sourceScene ? (garmentType === "tshirt" ? <Shirt color={color} side={side} frontArtwork={frontArtwork} backArtwork={backArtwork} sourceScene={sourceScene} /> : <GarmentModel garmentType={garmentType} color={color} side={side} sourceScene={sourceScene} />) : <mesh><boxGeometry args={[1, 1.5, 0.4]} /><meshStandardMaterial color={color} roughness={0.85} /></mesh>}
+        {sourceScene ? (garmentType === "tshirt" ? <Shirt color={color} side={side} frontArtwork={frontArtwork} backArtwork={backArtwork} sourceScene={sourceScene} /> : <GarmentModel garmentType={garmentType} color={color} side={side} frontArtwork={frontArtwork} backArtwork={backArtwork} sourceScene={sourceScene} />) : <mesh><boxGeometry args={[1, 1.5, 0.4]} /><meshStandardMaterial color={color} roughness={0.85} /></mesh>}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.38, 0]}><planeGeometry args={[10, 10]} /><meshStandardMaterial color="#d4d1c8" roughness={1} /></mesh>
         <OrbitControls enablePan={false} minDistance={4.2} maxDistance={7.2} minPolarAngle={Math.PI / 2.5} maxPolarAngle={Math.PI / 1.8} enableDamping dampingFactor={0.08} />
       </Canvas>
