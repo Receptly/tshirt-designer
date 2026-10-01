@@ -7,12 +7,12 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { GarmentArtworkSlot, GarmentType, ShirtSide } from "@/lib/configuration";
 
-export interface CanvasSource { element: HTMLCanvasElement | null; revision: number; }
+export interface CanvasSource { element: HTMLCanvasElement | null; revision: number; json?: string; }
 interface ViewerProps { garmentType: GarmentType; color: string; side: ShirtSide; frontArtwork: CanvasSource; backArtwork: CanvasSource; frontMeshArtwork: Record<GarmentArtworkSlot, CanvasSource>; backMeshArtwork: Record<GarmentArtworkSlot, CanvasSource>; }
 
 const MODEL_PATHS: Record<GarmentType, string> = {
   tshirt: "/models/02.glb",
-  hoodie: "/models/premium_eco_hoodie.glb",
+  hoodie: "/models/hoodie.glb",
   pants: "/models/pants.glb",
 };
 
@@ -70,9 +70,9 @@ function GarmentArtworkOverlays({ garmentType, scene, sources }: { garmentType: 
       if (object instanceof THREE.Mesh && object.visible && object.geometry.getAttribute("uv")) meshes.push(object);
     });
     if (garmentType === "hoodie") return [
-      { mesh: meshes[3], slot: "body" as GarmentArtworkSlot },
-      { mesh: meshes[9], slot: "leftArm" as GarmentArtworkSlot },
-      { mesh: meshes[5], slot: "rightArm" as GarmentArtworkSlot },
+      { mesh: meshes[0], slot: "body" as GarmentArtworkSlot },
+      { mesh: meshes[18], slot: "leftArm" as GarmentArtworkSlot },
+      { mesh: meshes[14], slot: "rightArm" as GarmentArtworkSlot },
     ].filter((target): target is { mesh: THREE.Mesh; slot: GarmentArtworkSlot } => Boolean(target.mesh));
     if (garmentType === "pants" && meshes[0]) return [
       { mesh: meshes[0], slot: "leftArm" as GarmentArtworkSlot },
