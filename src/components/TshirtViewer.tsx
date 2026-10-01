@@ -36,7 +36,7 @@ function UVArtworkOverlay({ target, source, flipY = false }: { target: THREE.Mes
     texture.repeat.set(1 / uRange, flipY ? -1 / vRange : 1 / vRange);
     texture.offset.set(-minU * texture.repeat.x, flipY ? maxV / vRange : -minV * texture.repeat.y);
     texture.needsUpdate = true;
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: false, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, toneMapped: false });
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, toneMapped: false });
     const mesh = new THREE.Mesh(target.geometry, material);
     mesh.name = `${target.name}-artwork-overlay`;
     mesh.userData.artworkOverlay = true;
@@ -105,6 +105,13 @@ function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<Vie
   }, [sourceScene]);
   const group = useRef<THREE.Group>(null);
   const targetRotation = side === "front" ? 0 : Math.PI;
+  const artworkTarget = useMemo(() => {
+    const meshes: THREE.Mesh[] = [];
+    normalizedScene.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.geometry.getAttribute("uv")) meshes.push(object);
+    });
+    return meshes[1] ?? meshes[0] ?? null;
+  }, [normalizedScene]);
   useFrame((_, delta) => {
     if (!group.current) return;
     const difference = targetRotation - group.current.rotation.y;
@@ -120,13 +127,6 @@ function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<Vie
       if ("color" in material && material.color instanceof THREE.Color) material.color.set(color);
     });
   });
-  const artworkTarget = useMemo(() => {
-    const meshes: THREE.Mesh[] = [];
-    normalizedScene.traverse((object) => {
-      if (object instanceof THREE.Mesh && object.geometry.getAttribute("uv")) meshes.push(object);
-    });
-    return meshes[1] ?? meshes[0] ?? null;
-  }, [normalizedScene]);
   return (
     <group ref={group}>
       <primitive object={normalizedScene} />

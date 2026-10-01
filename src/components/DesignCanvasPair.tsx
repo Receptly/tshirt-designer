@@ -9,6 +9,7 @@ const BOARD_HEIGHT = 640;
 
 export interface DesignCanvasActions {
   addImage: (imageUrl: string) => Promise<void>;
+  replaceImage: (imageUrl: string) => Promise<void>;
   addText: () => void;
   addLine: () => void;
   removeSelected: () => void;
@@ -79,6 +80,25 @@ export default function DesignCanvasPair({ activeSide, frontJson, backJson, onRe
             cornerColor: "#d9663e",
             transparentCorners: false,
           });
+          canvas.add(image);
+          canvas.setActiveObject(image);
+          canvas.requestRenderAll();
+          notifyChange();
+        },
+        replaceImage: async (imageUrl) => {
+          const image = await FabricImage.fromURL(imageUrl);
+          const fitScale = Math.min(320 / image.width, 360 / image.height, 1);
+          image.set({
+            left: BOARD_WIDTH / 2,
+            top: BOARD_HEIGHT / 2,
+            originX: "center",
+            originY: "center",
+            scaleX: fitScale,
+            scaleY: fitScale,
+            cornerColor: "#d9663e",
+            transparentCorners: false,
+          });
+          canvas.remove(...canvas.getObjects().filter((object) => object instanceof FabricImage));
           canvas.add(image);
           canvas.setActiveObject(image);
           canvas.requestRenderAll();
