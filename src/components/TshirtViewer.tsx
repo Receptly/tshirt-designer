@@ -12,7 +12,7 @@ interface ViewerProps { garmentType: GarmentType; color: string; side: ShirtSide
 
 const MODEL_PATHS: Record<GarmentType, string> = {
   tshirt: "/models/02.glb",
-  hoodie: "/models/hoodie.glb",
+  hoodie: "/models/premium_eco_hoodie.glb",
   pants: "/models/pants.glb",
 };
 
@@ -70,9 +70,9 @@ function GarmentArtworkOverlays({ garmentType, scene, sources }: { garmentType: 
       if (object instanceof THREE.Mesh && object.visible && object.geometry.getAttribute("uv")) meshes.push(object);
     });
     if (garmentType === "hoodie") return [
-      { mesh: meshes[0], slot: "body" as GarmentArtworkSlot },
-      { mesh: meshes[18], slot: "leftArm" as GarmentArtworkSlot },
-      { mesh: meshes[14], slot: "rightArm" as GarmentArtworkSlot },
+      { mesh: meshes[3], slot: "body" as GarmentArtworkSlot },
+      { mesh: meshes[9], slot: "leftArm" as GarmentArtworkSlot },
+      { mesh: meshes[5], slot: "rightArm" as GarmentArtworkSlot },
     ].filter((target): target is { mesh: THREE.Mesh; slot: GarmentArtworkSlot } => Boolean(target.mesh));
     if (garmentType === "pants" && meshes[0]) return [
       { mesh: meshes[0], slot: "leftArm" as GarmentArtworkSlot },
@@ -162,7 +162,7 @@ function GarmentModel({ garmentType, color, side, frontMeshArtwork, backMeshArtw
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       materials.forEach((material) => {
-        if (garmentType === "pants" && material instanceof THREE.MeshStandardMaterial) {
+        if ((garmentType === "hoodie" || garmentType === "pants") && material instanceof THREE.MeshStandardMaterial) {
           material.map = null;
           material.needsUpdate = true;
         }
@@ -200,7 +200,7 @@ export default function TshirtViewer({ garmentType, color, side, frontArtwork, b
         <color attach="background" args={["#e3e0d7"]} /><ambientLight intensity={1.25} /><directionalLight position={[3, 5, 4]} intensity={3.1} /><directionalLight position={[-4, 2, -2]} intensity={0.65} /><hemisphereLight args={["#fffdf5", "#77756d", 0.9]} />
         {sourceScene ? (garmentType === "tshirt" ? <Shirt color={color} side={side} frontArtwork={frontArtwork} backArtwork={backArtwork} sourceScene={sourceScene} /> : <GarmentModel garmentType={garmentType} color={color} side={side} frontMeshArtwork={frontMeshArtwork} backMeshArtwork={backMeshArtwork} sourceScene={sourceScene} />) : <mesh><boxGeometry args={[1, 1.5, 0.4]} /><meshStandardMaterial color={color} roughness={0.85} /></mesh>}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.38, 0]}><planeGeometry args={[10, 10]} /><meshStandardMaterial color="#d4d1c8" roughness={1} /></mesh>
-        <OrbitControls enablePan={false} minDistance={4.2} maxDistance={7.2} minPolarAngle={Math.PI / 2.5} maxPolarAngle={Math.PI / 1.8} enableDamping dampingFactor={0.08} />
+        <OrbitControls enablePan={false} minDistance={1.7} maxDistance={7.2} minPolarAngle={Math.PI / 2.5} maxPolarAngle={Math.PI / 1.8} enableDamping dampingFactor={0.08} />
       </Canvas>
       {loadError ? <div className="model-load-error">Could not load the 3D {garmentType} model.</div> : null}
       <div className="viewer-hint"><span className="drag-icon">↔</span> Drag to rotate <span>·</span> Scroll to zoom</div><div className="model-badge"><span /> Studio preview</div>
