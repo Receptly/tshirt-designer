@@ -74,6 +74,8 @@ function GarmentArtworkOverlays({ garmentType, scene, sources }: { garmentType: 
       { mesh: meshes[3], slot: "body" as GarmentArtworkSlot },
       { mesh: meshes[9], slot: "leftArm" as GarmentArtworkSlot },
       { mesh: meshes[5], slot: "rightArm" as GarmentArtworkSlot },
+      { mesh: meshes[6], slot: "hood" as GarmentArtworkSlot },
+      { mesh: meshes[7], slot: "hood" as GarmentArtworkSlot },
     ].filter((target): target is { mesh: THREE.Mesh; slot: GarmentArtworkSlot } => Boolean(target.mesh));
     if (garmentType === "pants" && meshes[0]) return [
       { mesh: meshes[0], slot: "leftArm" as GarmentArtworkSlot },

@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { GarmentArtworkSlot, GarmentType } from "@/lib/configuration";
 
 const garmentTargets: Record<Exclude<GarmentType, "tshirt">, { id: GarmentArtworkSlot; label: string }[]> = {
-  hoodie: [{ id: "body", label: "Body" }, { id: "leftArm", label: "Left arm" }, { id: "rightArm", label: "Right arm" }],
+  hoodie: [{ id: "body", label: "Body" }, { id: "hood", label: "Hood" }, { id: "leftArm", label: "Left arm" }, { id: "rightArm", label: "Right arm" }],
   pants: [{ id: "leftArm", label: "Left leg" }, { id: "rightArm", label: "Right leg" }],
 };
 

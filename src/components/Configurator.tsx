@@ -11,9 +11,9 @@ import ImageGeneratorPanel from "@/components/ImageGeneratorPanel";
 import type { CanvasSource } from "@/components/TshirtViewer";
 
 const GarmentViewer = dynamic(() => import("@/components/TshirtViewer"), { ssr: false, loading: () => <div className="viewer-loading"><div className="spinner" /><span>Preparing studio...</span></div> });
-const artworkSlots: { id: GarmentArtworkSlot; label: string }[] = [{ id: "body", label: "Body" }, { id: "leftArm", label: "Left arm" }, { id: "rightArm", label: "Right arm" }];
+const artworkSlots: { id: GarmentArtworkSlot; label: string }[] = [{ id: "body", label: "Body" }, { id: "hood", label: "Hood" }, { id: "leftArm", label: "Left arm" }, { id: "rightArm", label: "Right arm" }];
 const pantsArtworkSlots: { id: GarmentArtworkSlot; label: string }[] = [{ id: "leftArm", label: "Left leg" }, { id: "rightArm", label: "Right leg" }];
-const emptyArtworkSlots = (): Record<GarmentArtworkSlot, CanvasSource> => ({ body: { element: null, revision: 0 }, leftArm: { element: null, revision: 0 }, rightArm: { element: null, revision: 0 } });
+const emptyArtworkSlots = (): Record<GarmentArtworkSlot, CanvasSource> => ({ body: { element: null, revision: 0 }, hood: { element: null, revision: 0 }, leftArm: { element: null, revision: 0 }, rightArm: { element: null, revision: 0 } });
 function preparePrintArtwork(image: HTMLImageElement) {
   const maxDimension = 1024;
   const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
@@ -170,7 +170,8 @@ export default function Configurator() {
       if (!canvas) { setMessage("No printable artwork remained after removing the white background."); return; }
       const previewUrl = canvas.toDataURL("image/png");
       void meshCanvasActions.current[slot]?.replaceImage(previewUrl);
-      setMessage(`${slot === "leftArm" ? "Left arm" : slot === "rightArm" ? "Right arm" : "Body"} artwork added.`);
+      const slotLabel = slot === "leftArm" ? "Left arm" : slot === "rightArm" ? "Right arm" : slot === "hood" ? "Hood" : "Body";
+      setMessage(`${slotLabel} artwork added.`);
     };
     image.onerror = () => { URL.revokeObjectURL(objectUrl); setMessage("That image could not be decoded."); };
     image.src = objectUrl;
