@@ -54,7 +54,11 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof OpenAI.APIError) {
       console.error("OpenAI image generation failed", { status: error.status, code: error.code, requestId: error.requestID });
-      if (error.status === 429) return Response.json({ error: "Image generation is busy. Please try again shortly." }, { status: 429 });
+      const code = `${error.code ?? ""} ${error.type ?? ""}`.toLowerCase();
+      if (code.includes("quota") || code.includes("billing")) {
+        return Response.json({ error: "OpenAI image credits or billing are unavailable. Check the API account's billing and usage limits." }, { status: 402 });
+      }
+      if (error.status === 429) return Response.json({ error: "OpenAI is rate-limiting image generation. Wait briefly, then try again." }, { status: 429 });
     } else {
       console.error("Unexpected image generation error", error);
     }
