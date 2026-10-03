@@ -7,7 +7,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { GarmentArtworkSlot, GarmentType, ShirtSide } from "@/lib/configuration";
 
-export interface CanvasSource { element: HTMLCanvasElement | null; revision: number; json?: string; }
+export interface CanvasBounds { left: number; top: number; width: number; height: number; }
+export interface CanvasSource { element: HTMLCanvasElement | null; revision: number; json?: string; svg?: string; bounds?: CanvasBounds; }
 interface ViewerProps { garmentType: GarmentType; color: string; side: ShirtSide; frontArtwork: CanvasSource; backArtwork: CanvasSource; frontMeshArtwork: Record<GarmentArtworkSlot, CanvasSource>; backMeshArtwork: Record<GarmentArtworkSlot, CanvasSource>; }
 
 const MODEL_PATHS: Record<GarmentType, string> = {

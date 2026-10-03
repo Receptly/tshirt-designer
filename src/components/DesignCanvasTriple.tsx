@@ -3,7 +3,7 @@
 import { Canvas as FabricCanvas, FabricImage, IText, Line } from "fabric";
 import { Slash, Trash2, Type } from "lucide-react";
 import { useEffect, useRef } from "react";
-import type { CanvasSource } from "@/components/TshirtViewer";
+import type { CanvasBounds, CanvasSource } from "@/components/TshirtViewer";
 import type { GarmentArtworkSlot } from "@/lib/configuration";
 
 const BOARD_WIDTH = 512;
@@ -27,7 +27,20 @@ export default function DesignCanvasTriple({ onChange, onRegister, slots: config
   const revisions = useRef<Record<GarmentArtworkSlot, number>>({ body: 0, leftArm: 0, rightArm: 0 });
   const restoredJson = useRef<Partial<Record<GarmentArtworkSlot, string>>>({});
   const callbacks = useRef({ onChange, onRegister });
-  const emit = (slot: GarmentArtworkSlot, canvas: FabricCanvas) => { revisions.current[slot] += 1; callbacks.current.onChange(slot, { element: canvas.toCanvasElement(1), revision: revisions.current[slot], json: JSON.stringify(canvas.toJSON()) }); };
+  const emit = (slot: GarmentArtworkSlot, canvas: FabricCanvas) => {
+    revisions.current[slot] += 1;
+    const objects = canvas.getObjects();
+    const rectangles = objects.map((object) => object.getBoundingRect());
+    const bounds: CanvasBounds | undefined = rectangles.length ? (() => {
+      const padding = 8;
+      const left = Math.max(0, Math.floor(Math.min(...rectangles.map((rect) => rect.left)) - padding));
+      const top = Math.max(0, Math.floor(Math.min(...rectangles.map((rect) => rect.top)) - padding));
+      const right = Math.min(BOARD_WIDTH, Math.ceil(Math.max(...rectangles.map((rect) => rect.left + rect.width)) + padding));
+      const bottom = Math.min(BOARD_HEIGHT, Math.ceil(Math.max(...rectangles.map((rect) => rect.top + rect.height)) + padding));
+      return { left, top, width: right - left, height: bottom - top };
+    })() : undefined;
+    callbacks.current.onChange(slot, { element: canvas.toCanvasElement(1), revision: revisions.current[slot], json: JSON.stringify(canvas.toJSON()), svg: objects.length ? canvas.toSVG() : undefined, bounds });
+  };
 
   useEffect(() => { callbacks.current = { onChange, onRegister }; }, [onChange, onRegister]);
 

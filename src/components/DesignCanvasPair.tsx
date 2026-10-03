@@ -2,6 +2,7 @@
 
 import { Canvas as FabricCanvas, FabricImage, IText, Line } from "fabric";
 import { useEffect, useRef } from "react";
+import type { CanvasBounds } from "@/components/TshirtViewer";
 import type { ShirtSide } from "@/lib/configuration";
 
 const BOARD_WIDTH = 512;
@@ -21,7 +22,7 @@ interface Props {
   frontJson: string | null;
   backJson: string | null;
   onRegister: (side: ShirtSide, actions: DesignCanvasActions | null) => void;
-  onChange: (side: ShirtSide, json: string, canvas: HTMLCanvasElement, revision: number) => void;
+  onChange: (side: ShirtSide, json: string, canvas: HTMLCanvasElement, revision: number, svg: string | undefined, bounds: CanvasBounds | undefined) => void;
 }
 
 export default function DesignCanvasPair({ activeSide, frontJson, backJson, onRegister, onChange }: Props) {
@@ -54,7 +55,17 @@ export default function DesignCanvasPair({ activeSide, frontJson, backJson, onRe
           if (!mounted) return;
           revision += 1;
           const artworkOnlyCanvas = canvas.toCanvasElement(1);
-          callbacks.current.onChange(side, JSON.stringify(canvas.toJSON()), artworkOnlyCanvas, revision);
+          const objects = canvas.getObjects();
+          const rectangles = objects.map((object) => object.getBoundingRect());
+          const bounds = rectangles.length ? (() => {
+            const padding = 8;
+            const left = Math.max(0, Math.floor(Math.min(...rectangles.map((rect) => rect.left)) - padding));
+            const top = Math.max(0, Math.floor(Math.min(...rectangles.map((rect) => rect.top)) - padding));
+            const right = Math.min(BOARD_WIDTH, Math.ceil(Math.max(...rectangles.map((rect) => rect.left + rect.width)) + padding));
+            const bottom = Math.min(BOARD_HEIGHT, Math.ceil(Math.max(...rectangles.map((rect) => rect.top + rect.height)) + padding));
+            return { left, top, width: right - left, height: bottom - top };
+          })() : undefined;
+          callbacks.current.onChange(side, JSON.stringify(canvas.toJSON()), artworkOnlyCanvas, revision, objects.length ? canvas.toSVG() : undefined, bounds);
         });
       };
       canvas.on("object:added", notifyChange);
