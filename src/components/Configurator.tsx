@@ -2,13 +2,16 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Check, Download, RotateCcw, Save, Slash, Trash2, Type, Upload } from "lucide-react";
-import { ChangeEvent, startTransition, useEffect, useRef, useState } from "react";
-import { activeDesign, defaultDesign, shirtColors, type GarmentArtworkSlot, type DesignConfiguration, type GarmentType, type ShirtDesign, type ShirtSize, type ShirtSide, updateActiveDesign, updateCanvasJson } from "@/lib/configuration";
+import { Camera, Check, Download, RotateCcw, Save, Slash, Trash2, Type, Upload } from "lucide-react";
+import { ChangeEvent, startTransition, useCallback, useEffect, useRef, useState } from "react";
+import { activeDesign, defaultDesign, isLightColor, shirtColors, type GarmentArtworkSlot, type DesignConfiguration, type GarmentType, type ShirtDesign, type ShirtSize, type ShirtSide, updateActiveDesign, updateCanvasJson } from "@/lib/configuration";
 import DesignCanvasPair, { type DesignCanvasActions } from "@/components/DesignCanvasPair";
 import DesignCanvasTriple from "@/components/DesignCanvasTriple";
 import ImageGeneratorPanel from "@/components/ImageGeneratorPanel";
 import type { CanvasSource } from "@/components/TshirtViewer";
+import type { ArtworkDragActions, ArtworkDragHandler } from "@/lib/artworkDrag";
+
+const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = reject; image.src = src; });
 
 const GarmentViewer = dynamic(() => import("@/components/TshirtViewer"), { ssr: false, loading: () => <div className="viewer-loading"><div className="spinner" /><span>Preparing studio...</span></div> });
 const artworkSlots: { id: GarmentArtworkSlot; label: string }[] = [{ id: "body", label: "Body" }, { id: "hood", label: "Hood" }, { id: "leftArm", label: "Left arm" }, { id: "rightArm", label: "Right arm" }];
@@ -99,7 +102,10 @@ export default function Configurator() {
   const [frontArtwork, setFrontArtwork] = useState<CanvasSource>({ element: null, revision: 0 });
   const [backArtwork, setBackArtwork] = useState<CanvasSource>({ element: null, revision: 0 });
   const [meshArtwork, setMeshArtwork] = useState<Record<ShirtSide, Record<GarmentArtworkSlot, CanvasSource>>>(() => ({ front: emptyArtworkSlots(), back: emptyArtworkSlots() }));
-  const meshCanvasActions = useRef<Partial<Record<GarmentArtworkSlot, { addImage: (imageUrl: string) => Promise<void>; replaceImage: (imageUrl: string) => Promise<void>; clear: () => void }>>>({});
+  const meshCanvasActions = useRef<Partial<Record<GarmentArtworkSlot, ArtworkDragActions & { addImage: (imageUrl: string) => Promise<void>; replaceImage: (imageUrl: string) => Promise<void>; clear: () => void }>>>({});
+  const captureView = useRef<((scale: number) => string | null) | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const registerCapture = useCallback((capture: ((scale: number) => string | null) | null) => { captureView.current = capture; }, []);
   useEffect(() => {
     let restored = defaultDesign;
     const saved = window.localStorage.getItem("threadline-design");
@@ -199,6 +205,71 @@ export default function Configurator() {
     if (!actions) throw new Error("The artwork canvas is not ready.");
     await actions.replaceImage(imageUrl);
   };
+  const handleArtworkDrag: ArtworkDragHandler = (phase, key, x, y) => {
+    const actions = key === "front" || key === "back" ? canvasActions.current[key] : meshCanvasActions.current[key];
+    if (!actions) return false;
+    if (phase === "start") return actions.dragStart(x, y);
+    if (phase === "move") actions.dragMove(x, y); else actions.dragEnd();
+    return true;
+  };
+  const previewCanvas = (side: ShirtSide, element: HTMLCanvasElement, revision: number) => {
+    const update = (current: CanvasSource): CanvasSource => ({ ...current, element, revision });
+    if (side === "front") setFrontArtwork(update); else setBackArtwork(update);
+  };
+  const previewMeshCanvas = (slot: GarmentArtworkSlot, source: CanvasSource) => {
+    const side = configuration.activeSide;
+    setMeshArtwork((current) => ({ ...current, [side]: { ...current[side], [slot]: { ...current[side][slot], element: source.element, revision: source.revision } } }));
+  };
+  const exportPreview = async () => {
+    if (!captureView.current) { setMessage("The 3D preview is still loading."); return; }
+    const originalSide = configuration.activeSide;
+    setIsExporting(true);
+    setMessage("Rendering front and back previews...");
+    try {
+      const shots: { label: string; image: HTMLImageElement }[] = [];
+      for (const side of ["front", "back"] as const) {
+        setConfiguration((current) => ({ ...current, activeSide: side }));
+        await new Promise((resolve) => window.setTimeout(resolve, side === originalSide && !shots.length ? 300 : 1600));
+        const url = captureView.current?.(3);
+        if (!url) throw new Error("The 3D preview could not be captured.");
+        shots.push({ label: side === "front" ? "Front" : "Back", image: await loadImage(url) });
+      }
+      const padding = 48;
+      const top = 150;
+      const sheet = document.createElement("canvas");
+      sheet.width = shots[0].image.width * 2 + padding * 3;
+      sheet.height = top + shots[0].image.height + padding;
+      const context = sheet.getContext("2d");
+      if (!context) throw new Error("This browser cannot compose the preview image.");
+      const colorName = shirtColors.find((color) => color.value === configuration.shirtColor)?.name ?? configuration.shirtColor.toUpperCase();
+      context.fillStyle = "#f7f6f2";
+      context.fillRect(0, 0, sheet.width, sheet.height);
+      context.fillStyle = "#202322";
+      context.font = "700 44px Arial, sans-serif";
+      context.fillText(`${configuration.garmentType === "hoodie" ? "Hoodie" : "T-shirt"} \u00b7 ${colorName} \u00b7 Size ${configuration.size}`, padding, 84);
+      context.font = "600 28px Arial, sans-serif";
+      shots.forEach((shot, index) => {
+        const x = padding + index * (shot.image.width + padding);
+        context.fillText(shot.label, x, top - 18);
+        context.drawImage(shot.image, x, top);
+      });
+      const blob = await new Promise<Blob | null>((resolve) => sheet.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("The preview image could not be created.");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${configuration.garmentType}-design-preview.png`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMessage("Design preview exported.");
+    } catch (error) {
+      console.error("Could not export the design preview", error);
+      setMessage("Could not export the design preview.");
+    } finally {
+      setConfiguration((current) => ({ ...current, activeSide: originalSide }));
+      setIsExporting(false);
+    }
+  };
   const saveDesign = () => { setIsSaving(true); window.localStorage.setItem("threadline-design", JSON.stringify(configuration)); window.setTimeout(() => { setIsSaving(false); setMessage("Design saved to this browser."); }, 450); };
   const exportArtwork = () => {
     const artboards: { svg: string; bounds: NonNullable<CanvasSource["bounds"]> }[] = [];
@@ -240,13 +311,13 @@ export default function Configurator() {
   }, [configuration, hasHydrated]);
   return (
     <main className="app-shell">
-      <header className="topbar"><Link className="brand" href="/" aria-label="Garment Designer home"><span className="brand-mark">G</span><span>Garment Designer</span></Link><div className="topbar-actions"><span className="save-state">{message || "Your design is private to this browser"}</span><button className="text-button" onClick={() => { canvasActions.current.front?.clear(); canvasActions.current.back?.clear(); Object.values(meshCanvasActions.current).forEach((actions) => actions?.clear()); setFrontArtwork({ element: null, revision: 0 }); setBackArtwork({ element: null, revision: 0 }); setMeshArtwork({ front: emptyArtworkSlots(), back: emptyArtworkSlots() }); setConfiguration(defaultDesign); window.localStorage.removeItem("threadline-design"); setMessage("Started a fresh design."); }}><RotateCcw size={15} /> Reset</button><button className="text-button" onClick={exportArtwork} title="Export artwork as SVG"><Download size={15} /><span>Export SVG</span></button><button className="save-button" onClick={saveDesign}><Save size={16} /> {isSaving ? "Saving..." : "Save design"}</button></div></header>
+      <header className="topbar"><Link className="brand" href="/" aria-label="Garment Designer home"><span className="brand-mark">G</span><span>Garment Designer</span></Link><div className="topbar-actions"><span className="save-state">{message || "Your design is private to this browser"}</span><button className="text-button" onClick={() => { canvasActions.current.front?.clear(); canvasActions.current.back?.clear(); Object.values(meshCanvasActions.current).forEach((actions) => actions?.clear()); setFrontArtwork({ element: null, revision: 0 }); setBackArtwork({ element: null, revision: 0 }); setMeshArtwork({ front: emptyArtworkSlots(), back: emptyArtworkSlots() }); setConfiguration(defaultDesign); window.localStorage.removeItem("threadline-design"); setMessage("Started a fresh design."); }}><RotateCcw size={15} /> Reset</button><button className="text-button" onClick={exportArtwork} title="Export artwork as SVG"><Download size={15} /><span>Export SVG</span></button><button className="text-button" onClick={exportPreview} disabled={isExporting} title="Export a front and back preview image of the finished design"><Camera size={15} /><span>{isExporting ? "Rendering..." : "Export preview"}</span></button><button className="save-button" onClick={saveDesign}><Save size={16} /> {isSaving ? "Saving..." : "Save design"}</button></div></header>
       <section className="workspace"><div className="intro"><p className="eyebrow">Workshop / Garment configurator</p><h1>Make it unmistakably yours.</h1><p className="lede">Customize garments, place artwork on each side, and save the editable design for production.</p></div>
         <div className="garment-selector" role="group" aria-label="Garment type">{([{ id: "tshirt", label: "T-shirt" }, { id: "hoodie", label: "Hoodie" }] as const).map((garment) => <button key={garment.id} className={configuration.garmentType === garment.id ? "garment-option selected" : "garment-option"} onClick={() => setConfiguration((current) => ({ ...current, garmentType: garment.id }))} aria-pressed={configuration.garmentType === garment.id}>{garment.label}</button>)}</div>
-        <div className="builder-grid"><section className="preview-panel"><div className="preview-topline"><span className="preview-label">Live 3D preview</span><span className="preview-side"><span className="live-dot" /> {configuration.activeSide} view</span></div><GarmentViewer key={configuration.garmentType} garmentType={configuration.garmentType} color={configuration.shirtColor} side={configuration.activeSide} frontArtwork={frontArtwork} backArtwork={backArtwork} frontMeshArtwork={meshArtwork.front} backMeshArtwork={meshArtwork.back} /><div className="side-switcher" role="tablist" aria-label="Artwork side">{(["front", "back"] as ShirtSide[]).map((side) => <button key={side} className={configuration.activeSide === side ? "side-tab active" : "side-tab"} onClick={() => setConfiguration((current) => ({ ...current, activeSide: side }))} role="tab" aria-selected={configuration.activeSide === side}>{side}<span className={side === "front" ? "shirt-outline front-outline" : "shirt-outline back-outline"} /></button>)}</div></section>
+        <div className="builder-grid"><section className="preview-panel"><div className="preview-topline"><span className="preview-label">Live 3D preview</span><span className="preview-side"><span className="live-dot" /> {configuration.activeSide} view</span></div><GarmentViewer key={configuration.garmentType} garmentType={configuration.garmentType} color={configuration.shirtColor} side={configuration.activeSide} frontArtwork={frontArtwork} backArtwork={backArtwork} frontMeshArtwork={meshArtwork.front} backMeshArtwork={meshArtwork.back} onArtworkDrag={handleArtworkDrag} onCaptureReady={registerCapture} /><div className="side-switcher" role="tablist" aria-label="Artwork side">{(["front", "back"] as ShirtSide[]).map((side) => <button key={side} className={configuration.activeSide === side ? "side-tab active" : "side-tab"} onClick={() => setConfiguration((current) => ({ ...current, activeSide: side }))} role="tab" aria-selected={configuration.activeSide === side}>{side}<span className={side === "front" ? "shirt-outline front-outline" : "shirt-outline back-outline"} /></button>)}</div></section>
           <aside className="controls-panel"><div className="control-section upload-section"><div className="section-heading"><div><span className="section-kicker">01 / Artwork</span><h2>Add your design</h2></div><span className="format-note">PNG / JPG · 10 MB</span></div>{configuration.garmentType === "hoodie" || configuration.garmentType === "pants" ? <div className="mesh-upload-grid">{(configuration.garmentType === "hoodie" ? artworkSlots : pantsArtworkSlots).map((slot) => { const uploaded = meshArtwork[configuration.activeSide][slot.id].element; return <label className="mesh-upload" key={slot.id}><Upload size={16} /><strong>{slot.label}</strong><span>{uploaded ? "Replace artwork" : "Upload artwork"}</span><input type="file" accept="image/png,image/jpeg" onChange={(event) => handleMeshUpload(event, slot.id)} /></label>; })}</div> : <><label className="upload-zone"><Upload size={20} /><span>{design ? "Replace canvas artwork" : "Choose canvas artwork"}</span><small>Use the editor below for text, lines, and placement</small><input type="file" accept="image/png,image/jpeg" onChange={handleUpload} /></label>{design ? <div className="asset-row"><div className="asset-thumb" style={{ backgroundImage: `url(${design.thumbnailUrl ?? design.imageUrl})` }} /><div className="asset-meta"><strong>{design.fileName}</strong><span>{design.imageWidth} × {design.imageHeight} px</span></div><button className="icon-button" onClick={() => { canvasActions.current[configuration.activeSide]?.clear(); setConfiguration((current) => updateActiveDesign(current, null)); }} aria-label="Clear artwork from this side"><Trash2 size={16} /></button></div> : null}</>}</div><ImageGeneratorPanel garmentType={configuration.garmentType as GarmentType} onUseImage={useGeneratedArtwork} />
-            <div className="control-section"><div className="section-heading"><div><span className="section-kicker">02 / Design canvas</span><h2>{configuration.garmentType === "hoodie" ? "Hoodie artwork" : configuration.garmentType === "pants" ? "Pants artwork" : `${configuration.activeSide} artwork`}</h2></div><span className="format-note">Drag · Resize · Rotate</span></div>{hasHydrated ? <><div style={{ display: configuration.garmentType === "hoodie" ? "block" : "none" }}><DesignCanvasTriple initialSources={meshArtwork[configuration.activeSide]} onChange={updateMeshCanvas} onRegister={(slot, actions) => { meshCanvasActions.current[slot] = actions ?? undefined; }} /></div>{configuration.garmentType === "hoodie" ? null : configuration.garmentType === "pants" ? <DesignCanvasTriple initialSources={meshArtwork[configuration.activeSide]} slots={pantsArtworkSlots} onChange={updateMeshCanvas} onRegister={(slot, actions) => { meshCanvasActions.current[slot] = actions ?? undefined; }} /> : <><div className="canvas-tools"><button className="canvas-tool" onClick={() => canvasActions.current[configuration.activeSide]?.addText()}><Type size={15} /> Text</button><button className="canvas-tool" onClick={() => canvasActions.current[configuration.activeSide]?.addLine()}><Slash size={15} /> Line</button><button className="canvas-tool" onClick={() => canvasActions.current[configuration.activeSide]?.removeSelected()}><Trash2 size={15} /> Delete</button></div><DesignCanvasPair activeSide={configuration.activeSide} frontJson={configuration.frontCanvasJson} backJson={configuration.backCanvasJson} onRegister={registerCanvas} onChange={updateCanvas} /></> }</> : <div className="empty-control">Restoring saved artwork...</div>}</div>
-            <div className="control-section color-section"><div className="section-heading"><div><span className="section-kicker">03 / Garment</span><h2>Garment color</h2></div><span className="color-name">{shirtColors.find((color) => color.value === configuration.shirtColor)?.name}</span></div><div className="swatches">{shirtColors.map((color) => <button key={color.value} className={configuration.shirtColor === color.value ? "swatch selected" : "swatch"} style={{ backgroundColor: color.value }} onClick={() => setConfiguration((current) => ({ ...current, shirtColor: color.value }))} aria-label={`Select ${color.name} garment`} aria-pressed={configuration.shirtColor === color.value}>{configuration.shirtColor === color.value ? <Check size={14} /> : null}</button>)}</div></div>
+            <div className="control-section"><div className="section-heading"><div><span className="section-kicker">02 / Design canvas</span><h2>{configuration.garmentType === "hoodie" ? "Hoodie artwork" : configuration.garmentType === "pants" ? "Pants artwork" : `${configuration.activeSide} artwork`}</h2></div><span className="format-note">Drag · Resize · Rotate</span></div>{hasHydrated ? <><div style={{ display: configuration.garmentType === "hoodie" ? "block" : "none" }}><DesignCanvasTriple initialSources={meshArtwork[configuration.activeSide]} onChange={updateMeshCanvas} onPreview={previewMeshCanvas} onRegister={(slot, actions) => { meshCanvasActions.current[slot] = actions ?? undefined; }} /></div>{configuration.garmentType === "hoodie" ? null : configuration.garmentType === "pants" ? <DesignCanvasTriple initialSources={meshArtwork[configuration.activeSide]} slots={pantsArtworkSlots} onChange={updateMeshCanvas} onPreview={previewMeshCanvas} onRegister={(slot, actions) => { meshCanvasActions.current[slot] = actions ?? undefined; }} /> : <><div className="canvas-tools"><button className="canvas-tool" onClick={() => canvasActions.current[configuration.activeSide]?.addText()}><Type size={15} /> Text</button><button className="canvas-tool" onClick={() => canvasActions.current[configuration.activeSide]?.addLine()}><Slash size={15} /> Line</button><button className="canvas-tool" onClick={() => canvasActions.current[configuration.activeSide]?.removeSelected()}><Trash2 size={15} /> Delete</button></div><DesignCanvasPair activeSide={configuration.activeSide} frontJson={configuration.frontCanvasJson} backJson={configuration.backCanvasJson} onRegister={registerCanvas} onChange={updateCanvas} onPreview={previewCanvas} /></> }</> : <div className="empty-control">Restoring saved artwork...</div>}</div>
+            <div className="control-section color-section"><div className="section-heading"><div><span className="section-kicker">03 / Garment</span><h2>Garment color</h2></div><span className="color-name">{shirtColors.find((color) => color.value === configuration.shirtColor)?.name ?? configuration.shirtColor.toUpperCase()}</span></div><div className="swatches" role="group" aria-label="Garment color palette">{shirtColors.map((color) => <button key={color.value} className={configuration.shirtColor === color.value ? "swatch selected" : "swatch"} style={{ backgroundColor: color.value, color: isLightColor(color.value) ? "#202322" : "#ffffff" }} onClick={() => setConfiguration((current) => ({ ...current, shirtColor: color.value }))} aria-label={`Select ${color.name} garment`} title={color.name} aria-pressed={configuration.shirtColor === color.value}>{configuration.shirtColor === color.value ? <Check size={14} /> : null}</button>)}</div><label className="custom-color"><span>Custom color</span><input type="color" value={configuration.shirtColor} onChange={(event) => setConfiguration((current) => ({ ...current, shirtColor: event.target.value }))} aria-label="Choose a custom garment color" /><output>{configuration.shirtColor.toUpperCase()}</output></label></div>
             <div className="control-section options-section"><span className="section-kicker">Garment size</span><div className="size-options">{(["S", "M", "L", "XL", "XXL"] as ShirtSize[]).map((size) => <button key={size} className={configuration.size === size ? "size-option selected" : "size-option"} onClick={() => setConfiguration((current) => ({ ...current, size }))}>{size}</button>)}</div></div>
           </aside></div>
       </section><footer className="site-footer"><span>Threadline studio · Made for small-batch makers</span><span>Original artwork stays yours · Production-ready files preserved</span></footer>

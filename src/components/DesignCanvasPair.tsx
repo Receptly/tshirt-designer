@@ -3,12 +3,13 @@
 import { Canvas as FabricCanvas, FabricImage, IText, Line } from "fabric";
 import { useEffect, useRef } from "react";
 import type { CanvasBounds } from "@/components/TshirtViewer";
+import { beginArtworkDrag, drawPreviewSurface, endArtworkDrag, moveArtworkDrag, type ArtworkDragActions, type ArtworkDragSession } from "@/lib/artworkDrag";
 import type { ShirtSide } from "@/lib/configuration";
 
 const BOARD_WIDTH = 512;
 const BOARD_HEIGHT = 640;
 
-export interface DesignCanvasActions {
+export interface DesignCanvasActions extends ArtworkDragActions {
   addImage: (imageUrl: string) => Promise<void>;
   replaceImage: (imageUrl: string) => Promise<void>;
   addText: () => void;
@@ -22,16 +23,17 @@ interface Props {
   frontJson: string | null;
   backJson: string | null;
   onRegister: (side: ShirtSide, actions: DesignCanvasActions | null) => void;
+  onPreview?: (side: ShirtSide, canvas: HTMLCanvasElement, revision: number) => void;
   onChange: (side: ShirtSide, json: string, canvas: HTMLCanvasElement, revision: number, svg: string | undefined, bounds: CanvasBounds | undefined) => void;
 }
 
-export default function DesignCanvasPair({ activeSide, frontJson, backJson, onRegister, onChange }: Props) {
+export default function DesignCanvasPair({ activeSide, frontJson, backJson, onRegister, onChange, onPreview }: Props) {
   const frontElement = useRef<HTMLCanvasElement>(null);
   const backElement = useRef<HTMLCanvasElement>(null);
-  const callbacks = useRef({ onRegister, onChange });
+  const callbacks = useRef({ onRegister, onChange, onPreview });
   const initialJson = useRef({ frontJson, backJson });
 
-  useEffect(() => { callbacks.current = { onRegister, onChange }; }, [onChange, onRegister]);
+  useEffect(() => { callbacks.current = { onRegister, onChange, onPreview }; }, [onChange, onPreview, onRegister]);
 
   useEffect(() => {
     const instances: Partial<Record<ShirtSide, FabricCanvas>> = {};
@@ -41,6 +43,8 @@ export default function DesignCanvasPair({ activeSide, frontJson, backJson, onRe
 
     const initialize = async (side: ShirtSide, element: HTMLCanvasElement | null, initialJson: string | null) => {
       if (!element) return;
+      let dragSession: ArtworkDragSession | null = null;
+      let previewSurface: HTMLCanvasElement | null = null;
       const canvas = new FabricCanvas(element, {
         width: BOARD_WIDTH,
         height: BOARD_HEIGHT,
@@ -78,6 +82,15 @@ export default function DesignCanvasPair({ activeSide, frontJson, backJson, onRe
       canvas.requestRenderAll();
       if (!mounted) return;
       callbacks.current.onRegister(side, {
+        dragStart: (x, y) => { dragSession = beginArtworkDrag(canvas, x, y); return Boolean(dragSession); },
+        dragMove: (x, y) => {
+          if (!dragSession) return;
+          moveArtworkDrag(canvas, dragSession, x, y);
+          previewSurface = drawPreviewSurface(previewSurface, canvas.toCanvasElement(1));
+          revision += 1;
+          callbacks.current.onPreview?.(side, previewSurface, revision);
+        },
+        dragEnd: () => { if (dragSession) endArtworkDrag(canvas, dragSession); dragSession = null; },
         addImage: async (imageUrl) => {
           const image = await FabricImage.fromURL(imageUrl);
           const fitScale = Math.min(320 / image.width, 360 / image.height, 1);
