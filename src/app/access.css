@@ -1,0 +1,57 @@
+.landing-main { max-width: 1100px; margin: 0 auto; padding: 64px 4.5vw; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); gap: 56px; align-items: start; }
+.landing-copy h1 { font-size: clamp(38px, 5vw, 60px); line-height: 1; font-weight: 400; letter-spacing: -.03em; margin: 13px 0 18px; }
+.landing-steps { list-style: none; margin: 32px 0 0; padding: 0; display: grid; gap: 14px; }
+.landing-steps li { display: flex; align-items: center; gap: 14px; color: var(--ink); font: 14px/1.4 Arial, sans-serif; }
+.landing-steps strong { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--ink); border-radius: 50%; font-size: 12px; }
+.join-card { background: #fffefa; border: 1px solid var(--line); padding: 28px; display: grid; gap: 16px; }
+.join-card h2 { margin: 0; font-size: 26px; font-weight: 400; line-height: 1.1; }
+.field { display: grid; gap: 7px; color: var(--muted); font: 12px Arial, sans-serif; border: 0; padding: 0; margin: 0; min-width: 0; }
+.field input[type="text"], .field input[type="password"], .field input[type="email"] { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 11px 12px; font: 14px Arial, sans-serif; }
+.field input:focus-visible, .group-chip input:focus-visible + span { outline: 2px solid var(--orange); outline-offset: 1px; }
+.optional { color: #a0a39d; }
+.group-field legend { padding: 0; margin-bottom: 8px; }
+.group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
+.group-chip { position: relative; cursor: pointer; }
+.group-chip input { position: absolute; opacity: 0; inset: 0; }
+.group-chip span { display: grid; place-items: center; height: 38px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: 13px Arial, sans-serif; }
+.group-chip:hover span { border-color: var(--orange); }
+.group-chip.selected span { background: var(--ink); border-color: var(--ink); color: #fff; }
+.join-hint { margin: 0; color: var(--muted); font: 12px/1.5 Arial, sans-serif; }
+.form-error { margin: 0; padding: 10px 12px; background: #fbeae4; color: #a8431f; font: 13px/1.4 Arial, sans-serif; }
+.primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; background: var(--orange); color: #fff; padding: 14px 18px; border-radius: 3px; font: 700 12px Arial, sans-serif; letter-spacing: .04em; }
+.primary-button:hover { background: #bf5433; }
+.primary-button:disabled { opacity: .6; cursor: wait; }
+.link-button { background: transparent; border: 0; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; font: 12px Arial, sans-serif; padding: 4px 0; justify-self: start; }
+.link-button:hover { color: var(--ink); }
+.site-footer a { color: var(--muted); }
+@media (max-width: 850px) { .landing-main { grid-template-columns: 1fr; gap: 36px; padding: 40px 20px; } }
+
+.admin-main { max-width: 1280px; margin: 0 auto; padding: 48px 4.5vw; }
+.admin-login { max-width: 400px; margin: 64px auto; }
+.admin-stats { display: flex; gap: 32px; margin: 26px 0 30px; flex-wrap: wrap; }
+.admin-stat strong { display: block; font-size: 34px; font-weight: 400; }
+.admin-stat span { color: var(--muted); font: 11px Arial, sans-serif; text-transform: uppercase; letter-spacing: .1em; }
+.admin-toolbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--ink); padding: 16px 0; font: 12px Arial, sans-serif; }
+.admin-toolbar input[type="search"], .admin-toolbar select { border: 1px solid var(--line); background: #fffefa; padding: 9px 10px; font: 13px Arial, sans-serif; color: var(--ink); }
+.admin-toolbar label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.admin-table { width: 100%; border-collapse: collapse; font: 13px Arial, sans-serif; }
+.admin-table th { text-align: left; padding: 10px 8px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; border-bottom: 1px solid var(--line); }
+.admin-table td { padding: 12px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.admin-table a { color: var(--ink); }
+.color-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line); vertical-align: -2px; margin-right: 6px; }
+.status-chip { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 11px; background: #efeee9; color: var(--muted); }
+.status-chip.saved { background: #e3efe5; color: #3f6d49; }
+.status-chip.stale { background: #fbeae4; color: #a8431f; }
+.admin-empty { padding: 32px 0; color: var(--muted); font: 14px Arial, sans-serif; }
+.participant-detail { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr); gap: 32px; align-items: start; margin-top: 24px; }
+.mockup-frame { background: #e7e4dc; border: 1px solid var(--line); }
+.mockup-frame img { display: block; width: 100%; height: auto; }
+.detail-list { display: grid; gap: 10px; font: 13px Arial, sans-serif; margin: 0; }
+.detail-list div { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.detail-list dt { color: var(--muted); } .detail-list dd { margin: 0; text-align: right; }
+.artwork-downloads { display: grid; gap: 12px; margin-top: 20px; }
+.artwork-row { display: flex; align-items: center; gap: 14px; border: 1px solid var(--line); background: #fffefa; padding: 10px; font: 13px Arial, sans-serif; }
+.artwork-row img { width: 72px; height: 72px; object-fit: contain; background-color: #fffefa; background-image: linear-gradient(45deg, #eeede8 25%, transparent 25%), linear-gradient(-45deg, #eeede8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eeede8 75%), linear-gradient(-45deg, transparent 75%, #eeede8 75%); background-size: 12px 12px; background-position: 0 0, 0 6px, 6px -6px, -6px 0; border: 1px solid var(--line); }
+.artwork-row > div { flex: 1; min-width: 0; }
+.artwork-row .canvas-tool { text-decoration: none; }
+@media (max-width: 850px) { .participant-detail { grid-template-columns: 1fr; } .admin-table { display: block; overflow-x: auto; } }

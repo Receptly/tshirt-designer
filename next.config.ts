@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["pg", "@electric-sql/pglite"],
   /* config options here */
   turbopack: {
     root: process.cwd(),

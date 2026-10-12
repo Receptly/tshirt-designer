@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Camera, Check, Download, RotateCcw, Save, Slash, Trash2, Type, Upload } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Camera, Check, Download, LogOut, RotateCcw, Save, Slash, Trash2, Type, Upload } from "lucide-react";
 import { ChangeEvent, startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { activeDesign, defaultDesign, isLightColor, shirtColors, type GarmentArtworkSlot, type DesignConfiguration, type GarmentType, type ShirtDesign, type ShirtSize, type ShirtSide, updateActiveDesign, updateCanvasJson } from "@/lib/configuration";
 import DesignCanvasPair, { type DesignCanvasActions } from "@/components/DesignCanvasPair";
@@ -10,6 +11,7 @@ import DesignCanvasTriple from "@/components/DesignCanvasTriple";
 import ImageGeneratorPanel from "@/components/ImageGeneratorPanel";
 import type { CanvasSource } from "@/components/TshirtViewer";
 import type { ArtworkDragActions, ArtworkDragHandler } from "@/lib/artworkDrag";
+import type { SavedDesignPayload, SavedMeshArtwork } from "@/lib/designPayload";
 
 const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = reject; image.src = src; });
 
@@ -93,35 +95,63 @@ function createSvgSheet(artboards: { svg: string; bounds: NonNullable<CanvasSour
   return new XMLSerializer().serializeToString(root);
 }
 
-export default function Configurator() {
-  const [configuration, setConfiguration] = useState<DesignConfiguration>(defaultDesign);
+function restoreConfiguration(saved: DesignConfiguration): DesignConfiguration {
+  const restored = { ...defaultDesign, ...saved };
+  if (restored.frontDesign?.imageUrl?.startsWith("blob:")) restored.frontDesign = null;
+  if (restored.backDesign?.imageUrl?.startsWith("blob:")) restored.backDesign = null;
+  if (restored.garmentType === "pants") restored.garmentType = "tshirt";
+  return restored;
+}
+
+function restoreMeshArtwork(saved: SavedMeshArtwork) {
+  const restored = { front: emptyArtworkSlots(), back: emptyArtworkSlots() };
+  for (const side of ["front", "back"] as const) {
+    for (const slot of ["body", "hood", "leftArm", "rightArm"] as const) {
+      const json = saved[side]?.[slot]?.json;
+      if (json) restored[side][slot] = { element: null, revision: 0, json };
+    }
+  }
+  return restored;
+}
+
+function serializeMeshArtwork(slots: Record<GarmentArtworkSlot, CanvasSource>) {
+  const saved: SavedMeshArtwork[ShirtSide] = {};
+  for (const slot of ["body", "hood", "leftArm", "rightArm"] as const) {
+    const json = slots[slot].json;
+    if (json && !json.includes('"objects":[]')) saved[slot] = { json };
+  }
+  return saved;
+}
+
+function mockupDataUrl(sheet: HTMLCanvasElement) {
+  const scale = Math.min(1, 1600 / sheet.width);
+  const small = document.createElement("canvas");
+  small.width = Math.round(sheet.width * scale);
+  small.height = Math.round(sheet.height * scale);
+  small.getContext("2d")?.drawImage(sheet, 0, 0, small.width, small.height);
+  return small.toDataURL("image/jpeg", 0.82);
+}
+
+interface ConfiguratorProps {
+  participant: { name: string; groupNumber: number };
+  initialDesign: SavedDesignPayload | null;
+}
+
+export default function Configurator({ participant, initialDesign }: ConfiguratorProps) {
+  const router = useRouter();
+  const [configuration, setConfiguration] = useState<DesignConfiguration>(() => initialDesign ? restoreConfiguration(initialDesign.configuration) : defaultDesign);
   const [hasHydrated, setHasHydrated] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialDesign ? "Your saved design is loaded." : "");
   const [isSaving, setIsSaving] = useState(false);
   const canvasActions = useRef<Partial<Record<ShirtSide, DesignCanvasActions>>>({});
   const [frontArtwork, setFrontArtwork] = useState<CanvasSource>({ element: null, revision: 0 });
   const [backArtwork, setBackArtwork] = useState<CanvasSource>({ element: null, revision: 0 });
-  const [meshArtwork, setMeshArtwork] = useState<Record<ShirtSide, Record<GarmentArtworkSlot, CanvasSource>>>(() => ({ front: emptyArtworkSlots(), back: emptyArtworkSlots() }));
+  const [meshArtwork, setMeshArtwork] = useState<Record<ShirtSide, Record<GarmentArtworkSlot, CanvasSource>>>(() => initialDesign ? restoreMeshArtwork(initialDesign.meshArtwork) : { front: emptyArtworkSlots(), back: emptyArtworkSlots() });
   const meshCanvasActions = useRef<Partial<Record<GarmentArtworkSlot, ArtworkDragActions & { addImage: (imageUrl: string) => Promise<void>; replaceImage: (imageUrl: string) => Promise<void>; clear: () => void }>>>({});
   const captureView = useRef<((scale: number) => string | null) | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const registerCapture = useCallback((capture: ((scale: number) => string | null) | null) => { captureView.current = capture; }, []);
-  useEffect(() => {
-    let restored = defaultDesign;
-    const saved = window.localStorage.getItem("threadline-design");
-    if (saved) {
-      try {
-        restored = JSON.parse(saved) as DesignConfiguration;
-        if (restored.frontDesign?.imageUrl?.startsWith("blob:")) restored.frontDesign = null;
-        if (restored.backDesign?.imageUrl?.startsWith("blob:")) restored.backDesign = null;
-        restored.frontCanvasJson ??= null;
-        restored.backCanvasJson ??= null;
-        restored.garmentType ??= "tshirt";
-        if (restored.garmentType === "pants") restored.garmentType = "tshirt";
-      } catch { window.localStorage.removeItem("threadline-design"); }
-    }
-    startTransition(() => { setConfiguration(restored); setHasHydrated(true); });
-  }, []);
+  useEffect(() => { startTransition(() => setHasHydrated(true)); }, []);
   const design = activeDesign(configuration);
   const registerCanvas = (side: ShirtSide, actions: DesignCanvasActions | null) => {
     canvasActions.current[side] = actions ?? undefined;
@@ -220,11 +250,9 @@ export default function Configurator() {
     const side = configuration.activeSide;
     setMeshArtwork((current) => ({ ...current, [side]: { ...current[side], [slot]: { ...current[side][slot], element: source.element, revision: source.revision } } }));
   };
-  const exportPreview = async () => {
-    if (!captureView.current) { setMessage("The 3D preview is still loading."); return; }
+  const renderMockupSheet = async () => {
+    if (!captureView.current) throw new Error("The 3D preview is still loading.");
     const originalSide = configuration.activeSide;
-    setIsExporting(true);
-    setMessage("Rendering front and back previews...");
     try {
       const shots: { label: string; image: HTMLImageElement }[] = [];
       for (const side of ["front", "back"] as const) {
@@ -253,6 +281,16 @@ export default function Configurator() {
         context.fillText(shot.label, x, top - 18);
         context.drawImage(shot.image, x, top);
       });
+      return sheet;
+    } finally {
+      setConfiguration((current) => ({ ...current, activeSide: originalSide }));
+    }
+  };
+  const exportPreview = async () => {
+    setIsExporting(true);
+    setMessage("Rendering front and back previews...");
+    try {
+      const sheet = await renderMockupSheet();
       const blob = await new Promise<Blob | null>((resolve) => sheet.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("The preview image could not be created.");
       const url = URL.createObjectURL(blob);
@@ -264,13 +302,33 @@ export default function Configurator() {
       setMessage("Design preview exported.");
     } catch (error) {
       console.error("Could not export the design preview", error);
-      setMessage("Could not export the design preview.");
+      setMessage(error instanceof Error ? error.message : "Could not export the design preview.");
     } finally {
-      setConfiguration((current) => ({ ...current, activeSide: originalSide }));
       setIsExporting(false);
     }
   };
-  const saveDesign = () => { setIsSaving(true); window.localStorage.setItem("threadline-design", JSON.stringify(configuration)); window.setTimeout(() => { setIsSaving(false); setMessage("Design saved to this browser."); }, 450); };
+  const saveDesign = async () => {
+    const payload: SavedDesignPayload = { configuration, meshArtwork: { front: serializeMeshArtwork(meshArtwork.front), back: serializeMeshArtwork(meshArtwork.back) } };
+    setIsSaving(true);
+    setMessage("Saving your design...");
+    try {
+      let mockup: string | null = null;
+      try { mockup = mockupDataUrl(await renderMockupSheet()); } catch (error) { console.warn("Saving without a preview image", error); }
+      const response = await fetch("/api/design", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload, mockup }) });
+      const result = await response.json() as { savedAt?: string; error?: string };
+      if (!response.ok) throw new Error(result.error || "Your design couldn't be saved.");
+      setMessage(`Saved at ${new Date(result.savedAt ?? Date.now()).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Your design couldn't be saved.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  const signOut = async () => {
+    await fetch("/api/session/logout", { method: "POST" });
+    router.push("/");
+    router.refresh();
+  };
   const exportArtwork = () => {
     const artboards: { svg: string; bounds: NonNullable<CanvasSource["bounds"]> }[] = [];
     if (configuration.garmentType === "tshirt") {
@@ -304,14 +362,9 @@ export default function Configurator() {
       setMessage("Could not export SVG artwork.");
     }
   };
-  useEffect(() => {
-    if (!hasHydrated) return;
-    try { window.localStorage.setItem("threadline-design", JSON.stringify(configuration)); }
-    catch (error) { console.warn("Could not autosave the current design", error); }
-  }, [configuration, hasHydrated]);
   return (
     <main className="app-shell">
-      <header className="topbar"><Link className="brand" href="/" aria-label="Garment Designer home"><span className="brand-mark">G</span><span>Garment Designer</span></Link><div className="topbar-actions"><span className="save-state">{message || "Your design is private to this browser"}</span><button className="text-button" onClick={() => { canvasActions.current.front?.clear(); canvasActions.current.back?.clear(); Object.values(meshCanvasActions.current).forEach((actions) => actions?.clear()); setFrontArtwork({ element: null, revision: 0 }); setBackArtwork({ element: null, revision: 0 }); setMeshArtwork({ front: emptyArtworkSlots(), back: emptyArtworkSlots() }); setConfiguration(defaultDesign); window.localStorage.removeItem("threadline-design"); setMessage("Started a fresh design."); }}><RotateCcw size={15} /> Reset</button><button className="text-button" onClick={exportArtwork} title="Export artwork as SVG"><Download size={15} /><span>Export SVG</span></button><button className="text-button" onClick={exportPreview} disabled={isExporting} title="Export a front and back preview image of the finished design"><Camera size={15} /><span>{isExporting ? "Rendering..." : "Export preview"}</span></button><button className="save-button" onClick={saveDesign}><Save size={16} /> {isSaving ? "Saving..." : "Save design"}</button></div></header>
+      <header className="topbar"><Link className="brand" href="/" aria-label="Garment Designer home"><span className="brand-mark">G</span><span>Garment Designer</span></Link><div className="topbar-actions"><span className="save-state">{message || `${participant.name} \u00b7 Group ${participant.groupNumber}`}</span><button className="text-button" onClick={() => { canvasActions.current.front?.clear(); canvasActions.current.back?.clear(); Object.values(meshCanvasActions.current).forEach((actions) => actions?.clear()); setFrontArtwork({ element: null, revision: 0 }); setBackArtwork({ element: null, revision: 0 }); setMeshArtwork({ front: emptyArtworkSlots(), back: emptyArtworkSlots() }); setConfiguration(defaultDesign); setMessage("Started a fresh design. Press Save to keep it."); }}><RotateCcw size={15} /> Reset</button><button className="text-button" onClick={exportArtwork} title="Export artwork as SVG"><Download size={15} /><span>Export SVG</span></button><button className="text-button" onClick={exportPreview} disabled={isExporting || isSaving} title="Export a front and back preview image of the finished design"><Camera size={15} /><span>{isExporting ? "Rendering..." : "Export preview"}</span></button><button className="save-button" onClick={saveDesign} disabled={isSaving || isExporting}><Save size={16} /> {isSaving ? "Saving..." : "Save design"}</button><button className="text-button" onClick={signOut} title="Sign out of this workshop session"><LogOut size={15} /><span>Sign out</span></button></div></header>
       <section className="workspace"><div className="intro"><p className="eyebrow">Workshop / Garment configurator</p><h1>Make it unmistakably yours.</h1><p className="lede">Customize garments, place artwork on each side, and save the editable design for production.</p></div>
         <div className="garment-selector" role="group" aria-label="Garment type">{([{ id: "tshirt", label: "T-shirt" }, { id: "hoodie", label: "Hoodie" }] as const).map((garment) => <button key={garment.id} className={configuration.garmentType === garment.id ? "garment-option selected" : "garment-option"} onClick={() => setConfiguration((current) => ({ ...current, garmentType: garment.id }))} aria-pressed={configuration.garmentType === garment.id}>{garment.label}</button>)}</div>
         <div className="builder-grid"><section className="preview-panel"><div className="preview-topline"><span className="preview-label">Live 3D preview</span><span className="preview-side"><span className="live-dot" /> {configuration.activeSide} view</span></div><GarmentViewer key={configuration.garmentType} garmentType={configuration.garmentType} color={configuration.shirtColor} side={configuration.activeSide} frontArtwork={frontArtwork} backArtwork={backArtwork} frontMeshArtwork={meshArtwork.front} backMeshArtwork={meshArtwork.back} onArtworkDrag={handleArtworkDrag} onCaptureReady={registerCapture} /><div className="side-switcher" role="tablist" aria-label="Artwork side">{(["front", "back"] as ShirtSide[]).map((side) => <button key={side} className={configuration.activeSide === side ? "side-tab active" : "side-tab"} onClick={() => setConfiguration((current) => ({ ...current, activeSide: side }))} role="tab" aria-selected={configuration.activeSide === side}>{side}<span className={side === "front" ? "shirt-outline front-outline" : "shirt-outline back-outline"} /></button>)}</div></section>

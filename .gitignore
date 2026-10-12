@@ -18,6 +18,9 @@
 *.db-shm
 *.db-wal
 
+# local development database (PGlite)
+/.data
+
 # next.js
 /.next/
 /out/

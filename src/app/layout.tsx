@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { createElement } from "react";
 import "./globals.css";
+import "./access.css";
 
 export const metadata: Metadata = {
   title: "Garment Designer",
