@@ -15,29 +15,7 @@ interface ViewerProps { garmentType: GarmentType; color: string; side: ShirtSide
 const MODEL_PATHS: Record<GarmentType, string> = {
   tshirt: "/models/02.glb",
   hoodie: "/models/premium_eco_hoodie.glb",
-  pants: "/models/low_poly_simple_pants_textured.glb",
 };
-
-function createLegGeometry(source: THREE.Mesh, side: "left" | "right") {
-  const geometry = source.geometry.toNonIndexed();
-  const position = geometry.getAttribute("position");
-  const triangles: number[] = [];
-  for (let triangle = 0; triangle < position.count; triangle += 3) {
-    const centerX = (position.getX(triangle) + position.getX(triangle + 1) + position.getX(triangle + 2)) / 3;
-    if ((side === "left" && centerX < 0) || (side === "right" && centerX >= 0)) triangles.push(triangle, triangle + 1, triangle + 2);
-  }
-  const legGeometry = new THREE.BufferGeometry();
-  Object.keys(geometry.attributes).forEach((name) => {
-    const attribute = geometry.getAttribute(name);
-    const values = new Float32Array(triangles.length * attribute.itemSize);
-    triangles.forEach((sourceIndex, targetIndex) => {
-      for (let component = 0; component < attribute.itemSize; component += 1) values[targetIndex * attribute.itemSize + component] = attribute.getComponent(sourceIndex, component);
-    });
-    legGeometry.setAttribute(name, new THREE.Float32BufferAttribute(values, attribute.itemSize));
-  });
-  geometry.dispose();
-  return legGeometry;
-}
 
 function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = false, geometry }: { target: THREE.Mesh; source: CanvasSource; dragKey: ArtworkDragKey; flipY?: boolean; flipX?: boolean; geometry?: THREE.BufferGeometry }) {
   const overlayRef = useRef<{ mesh: THREE.Mesh; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial } | null>(null);
@@ -80,7 +58,6 @@ function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = fals
       overlayRef.current = null;
       overlay.texture.dispose();
       overlay.material.dispose();
-      if (geometry) geometry.dispose();
     };
   }, [geometry, overlay, target]);
 
@@ -104,10 +81,6 @@ function GarmentArtworkOverlays({ garmentType, scene, sources }: { garmentType: 
       { mesh: meshes[6], slot: "hood" as GarmentArtworkSlot, geometry: undefined },
       { mesh: meshes[7], slot: "hood" as GarmentArtworkSlot, geometry: undefined },
     ] as OverlayTarget[]).filter((target): target is OverlayTarget & { mesh: THREE.Mesh } => Boolean(target.mesh));
-    if (garmentType === "pants" && meshes[0]) return [
-      { mesh: meshes[0], slot: "leftArm" as GarmentArtworkSlot, geometry: createLegGeometry(meshes[0], "left") },
-      { mesh: meshes[0], slot: "rightArm" as GarmentArtworkSlot, geometry: createLegGeometry(meshes[0], "right") },
-    ];
     return [];
   }, [garmentType, scene]);
   return <>{targets.map(({ mesh, slot, geometry }) => <UVArtworkOverlay key={`${mesh.uuid}-${slot}`} target={mesh} source={sources[slot]} dragKey={slot} flipY={slot !== "body"} geometry={geometry} />)}</>;
@@ -194,7 +167,7 @@ function GarmentModel({ garmentType, color, side, frontMeshArtwork, backMeshArtw
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       materials.forEach((material) => {
-        if ((garmentType === "hoodie" || garmentType === "pants") && material instanceof THREE.MeshStandardMaterial) {
+        if (garmentType === "hoodie" && material instanceof THREE.MeshStandardMaterial) {
           material.map = null;
           material.needsUpdate = true;
         }

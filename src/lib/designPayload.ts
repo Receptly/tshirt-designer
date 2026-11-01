@@ -10,7 +10,7 @@ export interface SavedDesignPayload {
 export const MAX_DESIGN_BYTES = 4_000_000;
 export const MAX_MOCKUP_BYTES = 700_000;
 
-const garmentTypes: GarmentType[] = ["tshirt", "hoodie", "pants"];
+const garmentTypes: GarmentType[] = ["tshirt", "hoodie"];
 const sizes: ShirtSize[] = ["S", "M", "L", "XL", "XXL"];
 const slots: GarmentArtworkSlot[] = ["body", "hood", "leftArm", "rightArm"];
 const sides: ShirtSide[] = ["front", "back"];
