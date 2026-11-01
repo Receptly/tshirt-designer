@@ -77,7 +77,7 @@ function GarmentArtworkOverlays({ garmentType, scene, sources }: { garmentType: 
     if (garmentType === "hoodie") return ([
       { mesh: meshes[3], slot: "body" as GarmentArtworkSlot, geometry: undefined },
       { mesh: meshes[4], slot: "body" as GarmentArtworkSlot, geometry: undefined },
-      { mesh: meshes[1], slot: "pocket" as GarmentArtworkSlot, geometry: undefined },
+      { mesh: meshes[0], slot: "pocket" as GarmentArtworkSlot, geometry: undefined },
       { mesh: meshes[9], slot: "leftArm" as GarmentArtworkSlot, geometry: undefined },
       { mesh: meshes[5], slot: "rightArm" as GarmentArtworkSlot, geometry: undefined },
       { mesh: meshes[6], slot: "hood" as GarmentArtworkSlot, geometry: undefined },
