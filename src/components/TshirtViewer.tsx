@@ -15,7 +15,7 @@ interface ViewerProps { garmentType: GarmentType; color: string; side: ShirtSide
 const MODEL_PATHS: Record<GarmentType, string> = {
   tshirt: "/models/02.glb",
   hoodie: "/models/premium_eco_hoodie.glb",
-  pants: "/models/pants.glb",
+  pants: "/models/low_poly_simple_pants_textured.glb",
 };
 
 function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = false }: { target: THREE.Mesh; source: CanvasSource; dragKey: ArtworkDragKey; flipY?: boolean; flipX?: boolean }) {
@@ -137,8 +137,8 @@ function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<Vie
   return (
     <group ref={group}>
       <primitive object={normalizedScene} />
-      {artworkPanels.front ? <UVArtworkOverlay target={artworkPanels.front} source={frontArtwork} dragKey="front" flipX /> : null}
-      {artworkPanels.back ? <UVArtworkOverlay target={artworkPanels.back} source={backArtwork} dragKey="back" flipX /> : null}
+      {artworkPanels.front ? <UVArtworkOverlay target={artworkPanels.front} source={frontArtwork} dragKey="front" /> : null}
+      {artworkPanels.back ? <UVArtworkOverlay target={artworkPanels.back} source={backArtwork} dragKey="back" /> : null}
     </group>
   );
 }
