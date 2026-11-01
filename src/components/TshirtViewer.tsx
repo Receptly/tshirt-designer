@@ -18,11 +18,23 @@ const MODEL_PATHS: Record<GarmentType, string> = {
   pants: "/models/low_poly_simple_pants_textured.glb",
 };
 
-function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = false }: { target: THREE.Mesh; source: CanvasSource; dragKey: ArtworkDragKey; flipY?: boolean; flipX?: boolean }) {
+function createLegGeometry(source: THREE.Mesh, side: "left" | "right") {
+  const geometry = source.geometry.toNonIndexed();
+  const position = geometry.getAttribute("position");
+  geometry.clearGroups();
+  for (let triangle = 0; triangle < position.count; triangle += 3) {
+    const centerX = (position.getX(triangle) + position.getX(triangle + 1) + position.getX(triangle + 2)) / 3;
+    if ((side === "left" && centerX < 0) || (side === "right" && centerX >= 0)) geometry.addGroup(triangle, 3, 0);
+  }
+  return geometry;
+}
+
+function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = false, geometry }: { target: THREE.Mesh; source: CanvasSource; dragKey: ArtworkDragKey; flipY?: boolean; flipX?: boolean; geometry?: THREE.BufferGeometry }) {
   const overlayRef = useRef<{ mesh: THREE.Mesh; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial } | null>(null);
   const overlay = useMemo(() => {
     if (!source.element) return null;
-    const uv = target.geometry.getAttribute("uv");
+    const overlayGeometry = geometry ?? target.geometry;
+    const uv = overlayGeometry.getAttribute("uv");
     if (!uv) return null;
     let minU = Infinity, minV = Infinity, maxU = -Infinity, maxV = -Infinity;
     for (let index = 0; index < uv.count; index += 1) {
@@ -39,7 +51,7 @@ function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = fals
     texture.offset.set(flipX ? maxU / uRange : -minU * texture.repeat.x, flipY ? maxV / vRange : -minV * texture.repeat.y);
     texture.needsUpdate = true;
     const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, toneMapped: false });
-    const mesh = new THREE.Mesh(target.geometry, material);
+    const mesh = new THREE.Mesh(overlayGeometry, material);
     mesh.name = `${target.name}-artwork-overlay`;
     mesh.userData.artworkOverlay = true;
     mesh.userData.artworkKey = dragKey;
@@ -47,7 +59,7 @@ function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = fals
     mesh.renderOrder = 2;
     mesh.frustumCulled = false;
     return { mesh, texture, material };
-  }, [dragKey, flipX, flipY, source.element, target]);
+  }, [dragKey, flipX, flipY, geometry, source.element, target]);
 
   useEffect(() => {
     if (!overlay) return;
@@ -58,8 +70,9 @@ function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = fals
       overlayRef.current = null;
       overlay.texture.dispose();
       overlay.material.dispose();
+      if (geometry) geometry.dispose();
     };
-  }, [overlay, target]);
+  }, [geometry, overlay, target]);
 
   useEffect(() => {
     if (overlayRef.current) overlayRef.current.texture.needsUpdate = true;
@@ -69,24 +82,25 @@ function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = fals
 
 function GarmentArtworkOverlays({ garmentType, scene, sources }: { garmentType: GarmentType; scene: THREE.Group; sources: Record<GarmentArtworkSlot, CanvasSource> }) {
   const targets = useMemo(() => {
+    type OverlayTarget = { mesh: THREE.Mesh | undefined; slot: GarmentArtworkSlot; geometry?: THREE.BufferGeometry };
     const meshes: THREE.Mesh[] = [];
     scene.traverse((object) => {
       if (object instanceof THREE.Mesh && object.visible && object.geometry.getAttribute("uv")) meshes.push(object);
     });
-    if (garmentType === "hoodie") return [
-      { mesh: meshes[3], slot: "body" as GarmentArtworkSlot },
-      { mesh: meshes[9], slot: "leftArm" as GarmentArtworkSlot },
-      { mesh: meshes[5], slot: "rightArm" as GarmentArtworkSlot },
-      { mesh: meshes[6], slot: "hood" as GarmentArtworkSlot },
-      { mesh: meshes[7], slot: "hood" as GarmentArtworkSlot },
-    ].filter((target): target is { mesh: THREE.Mesh; slot: GarmentArtworkSlot } => Boolean(target.mesh));
+    if (garmentType === "hoodie") return ([
+      { mesh: meshes[3], slot: "body" as GarmentArtworkSlot, geometry: undefined },
+      { mesh: meshes[9], slot: "leftArm" as GarmentArtworkSlot, geometry: undefined },
+      { mesh: meshes[5], slot: "rightArm" as GarmentArtworkSlot, geometry: undefined },
+      { mesh: meshes[6], slot: "hood" as GarmentArtworkSlot, geometry: undefined },
+      { mesh: meshes[7], slot: "hood" as GarmentArtworkSlot, geometry: undefined },
+    ] as OverlayTarget[]).filter((target): target is OverlayTarget & { mesh: THREE.Mesh } => Boolean(target.mesh));
     if (garmentType === "pants" && meshes[0]) return [
-      { mesh: meshes[0], slot: "leftArm" as GarmentArtworkSlot },
-      { mesh: meshes[0], slot: "rightArm" as GarmentArtworkSlot },
+      { mesh: meshes[0], slot: "leftArm" as GarmentArtworkSlot, geometry: createLegGeometry(meshes[0], "left") },
+      { mesh: meshes[0], slot: "rightArm" as GarmentArtworkSlot, geometry: createLegGeometry(meshes[0], "right") },
     ];
     return [];
   }, [garmentType, scene]);
-  return <>{targets.map(({ mesh, slot }) => <UVArtworkOverlay key={`${mesh.uuid}-${slot}`} target={mesh} source={sources[slot]} dragKey={slot} flipY={slot !== "body"} />)}</>;
+  return <>{targets.map(({ mesh, slot, geometry }) => <UVArtworkOverlay key={`${mesh.uuid}-${slot}`} target={mesh} source={sources[slot]} dragKey={slot} flipY={slot !== "body"} geometry={geometry} />)}</>;
 }
 
 function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<ViewerProps, "color" | "side" | "frontArtwork" | "backArtwork"> & { sourceScene: THREE.Group }) {
@@ -137,8 +151,8 @@ function Shirt({ color, side, frontArtwork, backArtwork, sourceScene }: Pick<Vie
   return (
     <group ref={group}>
       <primitive object={normalizedScene} />
-      {artworkPanels.front ? <UVArtworkOverlay target={artworkPanels.front} source={frontArtwork} dragKey="front" /> : null}
-      {artworkPanels.back ? <UVArtworkOverlay target={artworkPanels.back} source={backArtwork} dragKey="back" /> : null}
+      {artworkPanels.front ? <UVArtworkOverlay target={artworkPanels.front} source={frontArtwork} dragKey="front" flipX /> : null}
+      {artworkPanels.back ? <UVArtworkOverlay target={artworkPanels.back} source={backArtwork} dragKey="back" flipX /> : null}
     </group>
   );
 }
