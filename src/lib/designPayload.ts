@@ -12,7 +12,7 @@ export const MAX_MOCKUP_BYTES = 700_000;
 
 const garmentTypes: GarmentType[] = ["tshirt", "hoodie"];
 const sizes: ShirtSize[] = ["S", "M", "L", "XL", "XXL"];
-const slots: GarmentArtworkSlot[] = ["body", "hood", "leftArm", "rightArm"];
+const slots: GarmentArtworkSlot[] = ["body", "pocket", "hood", "leftArm", "rightArm"];
 const sides: ShirtSide[] = ["front", "back"];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);

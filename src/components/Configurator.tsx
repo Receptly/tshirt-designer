@@ -16,8 +16,8 @@ import type { SavedDesignPayload, SavedMeshArtwork } from "@/lib/designPayload";
 const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = reject; image.src = src; });
 
 const GarmentViewer = dynamic(() => import("@/components/TshirtViewer"), { ssr: false, loading: () => <div className="viewer-loading"><div className="spinner" /><span>Preparing studio...</span></div> });
-const artworkSlots: { id: GarmentArtworkSlot; label: string }[] = [{ id: "body", label: "Body" }, { id: "hood", label: "Hood" }, { id: "leftArm", label: "Left arm" }, { id: "rightArm", label: "Right arm" }];
-const emptyArtworkSlots = (): Record<GarmentArtworkSlot, CanvasSource> => ({ body: { element: null, revision: 0 }, hood: { element: null, revision: 0 }, leftArm: { element: null, revision: 0 }, rightArm: { element: null, revision: 0 } });
+const artworkSlots: { id: GarmentArtworkSlot; label: string }[] = [{ id: "body", label: "Body" }, { id: "pocket", label: "Pocket" }, { id: "hood", label: "Hood" }, { id: "leftArm", label: "Left arm" }, { id: "rightArm", label: "Right arm" }];
+const emptyArtworkSlots = (): Record<GarmentArtworkSlot, CanvasSource> => ({ body: { element: null, revision: 0 }, pocket: { element: null, revision: 0 }, hood: { element: null, revision: 0 }, leftArm: { element: null, revision: 0 }, rightArm: { element: null, revision: 0 } });
 function preparePrintArtwork(image: HTMLImageElement) {
   const maxDimension = 1024;
   const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
@@ -104,7 +104,7 @@ function restoreConfiguration(saved: DesignConfiguration): DesignConfiguration {
 function restoreMeshArtwork(saved: SavedMeshArtwork) {
   const restored = { front: emptyArtworkSlots(), back: emptyArtworkSlots() };
   for (const side of ["front", "back"] as const) {
-    for (const slot of ["body", "hood", "leftArm", "rightArm"] as const) {
+    for (const slot of ["body", "pocket", "hood", "leftArm", "rightArm"] as const) {
       const json = saved[side]?.[slot]?.json;
       if (json) restored[side][slot] = { element: null, revision: 0, json };
     }
@@ -114,7 +114,7 @@ function restoreMeshArtwork(saved: SavedMeshArtwork) {
 
 function serializeMeshArtwork(slots: Record<GarmentArtworkSlot, CanvasSource>) {
   const saved: SavedMeshArtwork[ShirtSide] = {};
-  for (const slot of ["body", "hood", "leftArm", "rightArm"] as const) {
+  for (const slot of ["body", "pocket", "hood", "leftArm", "rightArm"] as const) {
     const json = slots[slot].json;
     if (json && !json.includes('"objects":[]')) saved[slot] = { json };
   }
@@ -204,7 +204,7 @@ export default function Configurator({ participant, initialDesign }: Configurato
       if (!canvas) { setMessage("No printable artwork remained after removing the white background."); return; }
       const previewUrl = canvas.toDataURL("image/png");
       void meshCanvasActions.current[slot]?.replaceImage(previewUrl);
-      const slotLabel = slot === "leftArm" ? "Left arm" : slot === "rightArm" ? "Right arm" : slot === "hood" ? "Hood" : "Body";
+      const slotLabel = slot === "leftArm" ? "Left arm" : slot === "rightArm" ? "Right arm" : slot === "hood" ? "Hood" : slot === "pocket" ? "Pocket" : "Body";
       setMessage(`${slotLabel} artwork added.`);
     };
     image.onerror = () => { URL.revokeObjectURL(objectUrl); setMessage("That image could not be decoded."); };

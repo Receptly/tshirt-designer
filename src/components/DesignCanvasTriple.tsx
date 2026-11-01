@@ -11,6 +11,7 @@ const BOARD_WIDTH = 512;
 const BOARD_HEIGHT = 640;
 const slots: { id: GarmentArtworkSlot; label: string }[] = [
   { id: "body", label: "Body" },
+  { id: "pocket", label: "Pocket" },
   { id: "hood", label: "Hood" },
   { id: "leftArm", label: "Left arm" },
   { id: "rightArm", label: "Right arm" },
@@ -25,9 +26,9 @@ interface Props {
 }
 
 export default function DesignCanvasTriple({ onChange, onRegister, onPreview, slots: configuredSlots = slots, initialSources }: Props) {
-  const elements = useRef<Record<GarmentArtworkSlot, HTMLCanvasElement | null>>({ body: null, hood: null, leftArm: null, rightArm: null });
+  const elements = useRef<Record<GarmentArtworkSlot, HTMLCanvasElement | null>>({ body: null, pocket: null, hood: null, leftArm: null, rightArm: null });
   const instances = useRef(new Map<GarmentArtworkSlot, FabricCanvas>());
-  const revisions = useRef<Record<GarmentArtworkSlot, number>>({ body: 0, hood: 0, leftArm: 0, rightArm: 0 });
+  const revisions = useRef<Record<GarmentArtworkSlot, number>>({ body: 0, pocket: 0, hood: 0, leftArm: 0, rightArm: 0 });
   const restoredJson = useRef<Partial<Record<GarmentArtworkSlot, string>>>({});
   const callbacks = useRef({ onChange, onRegister, onPreview });
   const dragSessions = useRef(new Map<GarmentArtworkSlot, ArtworkDragSession>());
