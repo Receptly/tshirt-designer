@@ -21,12 +21,22 @@ const MODEL_PATHS: Record<GarmentType, string> = {
 function createLegGeometry(source: THREE.Mesh, side: "left" | "right") {
   const geometry = source.geometry.toNonIndexed();
   const position = geometry.getAttribute("position");
-  geometry.clearGroups();
+  const triangles: number[] = [];
   for (let triangle = 0; triangle < position.count; triangle += 3) {
     const centerX = (position.getX(triangle) + position.getX(triangle + 1) + position.getX(triangle + 2)) / 3;
-    if ((side === "left" && centerX < 0) || (side === "right" && centerX >= 0)) geometry.addGroup(triangle, 3, 0);
+    if ((side === "left" && centerX < 0) || (side === "right" && centerX >= 0)) triangles.push(triangle, triangle + 1, triangle + 2);
   }
-  return geometry;
+  const legGeometry = new THREE.BufferGeometry();
+  Object.keys(geometry.attributes).forEach((name) => {
+    const attribute = geometry.getAttribute(name);
+    const values = new Float32Array(triangles.length * attribute.itemSize);
+    triangles.forEach((sourceIndex, targetIndex) => {
+      for (let component = 0; component < attribute.itemSize; component += 1) values[targetIndex * attribute.itemSize + component] = attribute.getComponent(sourceIndex, component);
+    });
+    legGeometry.setAttribute(name, new THREE.Float32BufferAttribute(values, attribute.itemSize));
+  });
+  geometry.dispose();
+  return legGeometry;
 }
 
 function UVArtworkOverlay({ target, source, dragKey, flipY = false, flipX = false, geometry }: { target: THREE.Mesh; source: CanvasSource; dragKey: ArtworkDragKey; flipY?: boolean; flipX?: boolean; geometry?: THREE.BufferGeometry }) {
